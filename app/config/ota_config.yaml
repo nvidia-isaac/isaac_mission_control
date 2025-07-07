@@ -1,0 +1,11 @@
+postgres:
+  db_name: file
+  password: postgres
+s3:
+  region_name: us-east-1
+  endpoint_url: "https://example.com"
+  aws_access_key_id: ""
+  aws_secret_access_key: ""
+mqtt:
+  host: localhost
+  port: 1883

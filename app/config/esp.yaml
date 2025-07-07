@@ -1,0 +1,9 @@
+# Stationarity detection params
+robot_radius_m:  0.3
+person_radius_m: 0.5
+stationary_time_secs: 5.0
+stationary_displacement_m: 0.2
+
+# Grouping params
+max_separation_m: 5.0
+min_members:  2

@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waypoint Selection</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Open Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            color: #333;
+            line-height: 1.6;
+            height: 100vh; 
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            max-width: 100%;
+            height: 100vh;
+            margin: 0;
+            background-color: white;
+            padding: 0;
+            overflow: hidden;
+        }
+        .header {
+            padding: 15px 25px;
+            background-color: #fafafa;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            height: calc(100vh - 70px);
+            min-height: 0;
+        }
+        .sidebar {
+            width: 30%;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #fafafa;
+            box-shadow: 0 0 20px rgba(0,0,0,0.03);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .map-container {
+            width: 70%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: #f5f5f5;
+            min-width: 0;
+        }
+        .map-controls {
+            padding: 12px 20px;
+            background-color: rgba(255,255,255,0.7);
+            backdrop-filter: blur(5px);
+            flex-shrink: 0;
+        }
+        .graph-container {
+            flex: 1;
+            margin: 0;
+            overflow: auto;
+            background-color: #f5f5f5;
+            max-height: none;
+            max-width: none;
+            position: relative;
+            min-height: 0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            height: 100%;
+        }
+        .card {
+            margin-bottom: 20px;
+            padding: 15px 0;
+            background: transparent;
+        }
+        .waypoints-panel {
+            background-color: #ffffff;
+            border-radius: 8px;
+            margin-top: 16px;
+            overflow: auto;
+            max-height: 300px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+        .waypoints-panel h3 {
+            padding: 12px 16px;
+            margin: 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            background-color: rgba(0,0,0,0.02);
+        }
+        .card h3 {
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+            position: relative;
+        }
+        .card h3:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 40px;
+            height: 3px;
+            background: linear-gradient(90deg, #84c900, transparent);
+            border-radius: 3px;
+        }
+        .controls {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #76b900;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(118, 185, 0, 0.15);
+        }
+        button:hover {
+            background: #6ba800;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(118, 185, 0, 0.2);
+        }
+        button:disabled {
+            background: #e6e6e6;
+            color: #999;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+        input[type="file"] {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.08);
+            background-color: white;
+            width: 100%;
+            margin-top: 4px;
+        }
+        .field-row {
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .field-row label {
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        .field-row input, .field-row select {
+            padding: 10px 12px;
+            width: 100%;
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            background-color: white;
+            box-sizing: border-box;
+        }
+        .field-row input:focus, .field-row select:focus {
+            outline: none;
+            border-color: #76b900;
+            box-shadow: 0 0 0 3px rgba(118, 185, 0, 0.08);
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 16px;
+            gap: 2px;
+            border: none;
+        }
+        .tab {
+            padding: 10px 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            color: #6c757d;
+            background: transparent;
+        }
+        .tab:hover {
+            background-color: rgba(118, 185, 0, 0.05);
+            color: #76b900;
+        }
+        .tab.active {
+            background-color: rgba(118, 185, 0, 0.08);
+            color: #5a9000;
+            font-weight: 500;
+        }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .sidebar-footer {
+            margin-top: 20px;
+            padding-top: 20px;
+            position: relative;
+        }
+        .sidebar-footer:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, rgba(0,0,0,0.06), transparent);
+        }
+        .zoom-controls {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            padding: 8px;
+            backdrop-filter: blur(5px);
+        }
+        .coordinate-display {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            z-index: 20;
+            backdrop-filter: blur(5px);
+        }
+        #graph-image {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            transform-origin: top left;
+            max-width: none;
+            max-height: none;
+            width: auto;
+            height: auto;
+            position: relative;
+        }
+        .selection-point {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background-color: #ff5252;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.7), 0 2px 4px rgba(0,0,0,0.2);
+            transition: transform 0.15s ease;
+        }
+        .selection-point:hover {
+            transform: translate(-50%, -50%) scale(1.2);
+        }
+        .selection-point.start {
+            background-color: #4caf50;
+        }
+        .selection-point.end {
+            background-color: #2196f3;
+        }
+        .origin-point {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: #9c27b0;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .point-label {
+            background-color: rgba(255, 255, 255, 0.85) !important;
+            padding: 3px 8px !important;
+            border-radius: 12px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            pointer-events: none;
+        }
+        .origin-label {
+            background-color: rgba(255, 255, 255, 0.85) !important;
+            padding: 4px 10px !important;
+            border-radius: 12px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            font-weight: 600 !important;
+            color: #9c27b0 !important;
+            pointer-events: none;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .zoom-controls button {
+            margin-bottom: 6px;
+            width: 34px;
+            height: 34px;
+            font-size: 18px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background-color: white;
+            color: #555;
+        }
+        .zoom-controls button:hover {
+            background-color: #f8f9fa;
+            color: #76b900;
+        }
+        .zoom-controls .zoom-level {
+            text-align: center;
+            font-size: 13px;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #555;
+        }
+        .route-visualization-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .route-image-container {
+            margin-top: 10px;
+            max-height: 300px;
+            overflow: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+        }
+        #route-image {
+            max-width: 100%;
+            display: block;
+        }
+        .map-tabs {
+            display: flex;
+            gap: 2px;
+            padding: 0 12px;
+        }
+        .map-tab {
+            padding: 10px 16px;
+            cursor: pointer;
+            border-radius: 6px 6px 0 0;
+            transition: all 0.2s ease;
+            color: #555;
+            background-color: rgba(255,255,255,0.5);
+        }
+        .map-tab:hover {
+            background-color: rgba(255,255,255,0.8);
+        }
+        .map-tab.active {
+            background-color: white;
+            font-weight: 500;
+            color: #76b900;
+        }
+        .route-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: auto;
+            height: 100%;
+            background-color: #f5f5f5;
+            padding: 0 20px 0 0;
+        }
+        #main-route-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .map-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Waypoint Selection Tool</h1>
+        </div>
+        
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="sidebar-content">
+                    <div class="tabs">
+                        <div class="tab active" data-tab="tab-upload">Upload Files</div>
+                        <div class="tab" data-tab="tab-existing">Use Existing Files</div>
+                    </div>
+                    
+                    <div class="tab-content active" id="tab-upload">
+                        <div class="card">
+                            <h3>Upload Map Image</h3>
+                            <form id="upload-map-form" enctype="multipart/form-data">
+                                <div class="field-row">
+                                    <label for="map-file">Map Image (PNG):</label>
+                                    <input type="file" id="map-file" name="map_file" accept=".png,.jpg,.jpeg">
+                                </div>
+                                <button type="submit">Upload Map</button>
+                            </form>
+                        </div>
+                        
+                        <div class="card">
+                            <h3>Upload Map Config or Enter Manually</h3>
+                            <div class="tabs">
+                                <div class="tab active" data-tab="tab-yaml">Upload YAML Config</div>
+                                <div class="tab" data-tab="tab-manual">Enter Manually</div>
+                            </div>
+                            
+                            <div class="tab-content active" id="tab-yaml">
+                                <form id="upload-config-form" enctype="multipart/form-data">
+                                    <div class="field-row">
+                                        <label for="config-file">Config File (YAML):</label>
+                                        <input type="file" id="config-file" name="config_file" accept=".yaml,.yml">
+                                    </div>
+                                    <button type="submit">Upload Config</button>
+                                </form>
+                            </div>
+                            
+                            <div class="tab-content" id="tab-manual">
+                                <div class="field-row">
+                                    <label for="manual-resolution">Resolution (m/pixel):</label>
+                                    <input type="number" id="manual-resolution" step="0.001" value="0.05">
+                                </div>
+                                <div class="field-row">
+                                    <label for="manual-origin-x">Origin X (m):</label>
+                                    <input type="number" id="manual-origin-x" step="0.01" value="0">
+                                </div>
+                                <div class="field-row">
+                                    <label for="manual-origin-y">Origin Y (m):</label>
+                                    <input type="number" id="manual-origin-y" step="0.01" value="0">
+                                </div>
+                                <div class="field-row">
+                                    <label for="manual-origin-theta">Origin Theta (rad):</label>
+                                    <input type="number" id="manual-origin-theta" step="0.01" value="0">
+                                </div>
+                                <button id="apply-manual-config">Apply Configuration</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-existing">
+                        <div class="card">
+                            <h3>Select Existing Map and Config</h3>
+                            <div class="field-row">
+                                <label for="existing-map">Map Image:</label>
+                                <select id="existing-map">
+                                    <option value="">Select a map...</option>
+                                    {% for map_file in map_files %}
+                                    <option value="{{ map_file }}">{{ map_file }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="field-row">
+                                <label for="existing-config">Config File:</label>
+                                <select id="existing-config">
+                                    <option value="">Select a config...</option>
+                                    {% for config_file in config_files %}
+                                    <option value="{{ config_file }}">{{ config_file }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button id="load-existing">Load Selected Files</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-footer">
+                    <div class="controls">
+                        <button id="clear-points-btn" disabled>Clear Points</button>
+                        <button id="generate-waypoints-btn" disabled>Generate Waypoints</button>
+                        <button id="visualize-route-btn" disabled>Visualize Route</button>
+                    </div>
+                    
+                    <div id="waypoints-panel" class="waypoints-panel" style="display: none;">
+                        <h3>Generated Waypoints</h3>
+                        <pre id="waypoints-json"></pre>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="map-container">
+                <div class="map-controls">
+                    <div class="map-tabs">
+                        <div class="map-tab active" data-target="map-view">Map</div>
+                        <div class="map-tab" data-target="route-view">Route Visualization</div>
+                    </div>
+                </div>
+                <div class="map-view" id="map-view">
+                    <div class="graph-container" id="graph-container">
+                        <img id="graph-image" src="" alt="Map will be shown here">
+                        <div class="coordinate-display" id="coordinate-display">X: 0.00 m, Y: 0.00 m</div>
+                        <div class="zoom-controls">
+                            <button id="zoom-in-btn">+</button>
+                            <div class="zoom-level" id="zoom-level">100%</div>
+                            <button id="zoom-out-btn">-</button>
+                            <button id="zoom-fit-btn">⟲</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="map-view" id="route-view" style="display: none;">
+                    <div class="route-container">
+                        <img id="main-route-image" src="" alt="Route will be shown here">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // Update active tab
+                    const tabParent = this.parentElement;
+                    tabParent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show content
+                    const tabId = this.getAttribute('data-tab');
+                    const tabContents = tabParent.nextElementSibling.tagName === 'DIV' && tabParent.nextElementSibling.classList.contains('tab-content') 
+                        ? tabParent.parentElement.querySelectorAll('.tab-content')
+                        : document.querySelectorAll('.tab-content');
+                    
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // DOM elements
+            const graphContainer = document.getElementById('graph-container');
+            const graphImage = document.getElementById('graph-image');
+            const clearPointsBtn = document.getElementById('clear-points-btn');
+            const generateWaypointsBtn = document.getElementById('generate-waypoints-btn');
+            const waypointsPanel = document.getElementById('waypoints-panel');
+            const waypointsJson = document.getElementById('waypoints-json');
+            const coordinateDisplay = document.getElementById('coordinate-display');
+            
+            // Forms and selectors
+            const uploadMapForm = document.getElementById('upload-map-form');
+            const uploadConfigForm = document.getElementById('upload-config-form');
+            const applyManualConfigBtn = document.getElementById('apply-manual-config');
+            const existingMapSelect = document.getElementById('existing-map');
+            const existingConfigSelect = document.getElementById('existing-config');
+            const loadExistingBtn = document.getElementById('load-existing');
+            
+            // State variables
+            let selectedPoints = [];
+            let mapConfig = null;
+            let currentZoom = 1.0;
+            const minZoom = 0.1;  // 10% of original size
+            const maxZoom = 2.0;  // 200% of original size
+            const zoomStep = 0.1;
+            
+            // Additional DOM elements
+            const visualizeRouteBtn = document.getElementById('visualize-route-btn');
+            const routeImage = document.getElementById('route-image');
+            
+            // Upload map form handler
+            uploadMapForm.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                const formData = new FormData(uploadMapForm);
+                
+                try {
+                    const response = await fetch('/upload/map', {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Failed to upload map');
+                    }
+                    
+                    const data = await response.json();
+                    alert(`Map ${data.filename} uploaded successfully!`);
+                    
+                    // Display the uploaded map immediately
+                    graphImage.src = `/map/${data.filename}`;
+                    clearPointsBtn.disabled = false;
+                    generateWaypointsBtn.disabled = true;
+                    
+                    // Clear any existing points
+                    selectedPoints = [];
+                    document.querySelectorAll('.selection-point').forEach(point => point.remove());
+                    document.querySelectorAll('.point-label').forEach(label => label.remove());
+                    
+                    // Update the existing maps dropdown without refreshing
+                    const option = document.createElement('option');
+                    option.value = data.filename;
+                    option.textContent = data.filename;
+                    existingMapSelect.appendChild(option);
+                    existingMapSelect.value = data.filename;
+                    
+                } catch (error) {
+                    console.error('Error uploading map:', error);
+                    alert('Error uploading map: ' + error.message);
+                }
+            });
+            
+            // Upload config form handler
+            uploadConfigForm.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                const formData = new FormData(uploadConfigForm);
+                
+                try {
+                    const response = await fetch('/upload/config', {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Failed to upload config');
+                    }
+                    
+                    const data = await response.json();
+                    alert(`Config ${data.filename} uploaded successfully!`);
+                    
+                    // Apply the config immediately if a map is loaded
+                    if (graphImage.src && graphImage.complete) {
+                        fetch(`/config/${data.filename}`)
+                            .then(response => response.json())
+                            .then(config => {
+                                mapConfig = config;
+                                visualizeOrigin();
+                                updateMarkerPositions();
+                            })
+                            .catch(err => console.error('Error loading config:', err));
+                    }
+                    
+                    // Update the existing configs dropdown without refreshing
+                    const option = document.createElement('option');
+                    option.value = data.filename;
+                    option.textContent = data.filename;
+                    existingConfigSelect.appendChild(option);
+                    existingConfigSelect.value = data.filename;
+                    
+                } catch (error) {
+                    console.error('Error uploading config:', error);
+                    alert('Error uploading config: ' + error.message);
+                }
+            });
+            
+            // Apply manual config handler
+            applyManualConfigBtn.addEventListener('click', function() {
+                const resolution = parseFloat(document.getElementById('manual-resolution').value);
+                const originX = parseFloat(document.getElementById('manual-origin-x').value);
+                const originY = parseFloat(document.getElementById('manual-origin-y').value);
+                const originTheta = parseFloat(document.getElementById('manual-origin-theta').value);
+                
+                if (isNaN(resolution) || isNaN(originX) || isNaN(originY) || isNaN(originTheta)) {
+                    alert('Please enter valid numbers for resolution and origin');
+                    return;
+                }
+                
+                if (!graphImage.src || graphImage.src === window.location.href) {
+                    alert('Please upload a map image first');
+                    return;
+                }
+                
+                mapConfig = {
+                    resolution: resolution,
+                    origin: [originX, originY, originTheta],
+                    image: graphImage.src.split('/').pop()
+                };
+                
+                clearPointsBtn.disabled = false;
+                
+                alert('Manual configuration applied successfully');
+            });
+            
+            // Load existing files handler
+            loadExistingBtn.addEventListener('click', async function() {
+                const mapFilename = existingMapSelect.value;
+                const configFilename = existingConfigSelect.value;
+                
+                if (!mapFilename) {
+                    alert('Please select a map file');
+                    return;
+                }
+                
+                try {
+                    // Load the map image
+                    graphImage.src = `/map/${mapFilename}`;
+                    clearPointsBtn.disabled = false;
+                    
+                    // If config selected, load it too
+                    if (configFilename) {
+                        const configResponse = await fetch(`/config/${configFilename}`);
+                        if (!configResponse.ok) {
+                            throw new Error('Failed to fetch config');
+                        }
+                        
+                        mapConfig = await configResponse.json();
+                    }
+                } catch (error) {
+                    console.error('Error loading files:', error);
+                    alert('Error loading files: ' + error.message);
+                }
+            });
+            
+            // Functions for zooming
+            function zoomIn() {
+                if (currentZoom < maxZoom) {
+                    currentZoom += zoomStep;
+                    applyZoom();
+                }
+            }
+            
+            function zoomOut() {
+                if (currentZoom > minZoom) {
+                    currentZoom -= zoomStep;
+                    applyZoom();
+                }
+            }
+            
+            function zoomFit() {
+                if (!graphImage.naturalWidth) return;
+                
+                // Calculate zoom to fit the image within the container
+                const containerWidth = graphContainer.clientWidth;
+                const containerHeight = graphContainer.clientHeight;
+                const imageWidth = graphImage.naturalWidth;
+                const imageHeight = graphImage.naturalHeight;
+                
+                const widthRatio = containerWidth / imageWidth;
+                const heightRatio = containerHeight / imageHeight;
+                
+                // Use the smaller ratio to ensure the entire image fits
+                currentZoom = Math.min(widthRatio, heightRatio) * 0.95; // 95% to leave a small margin
+                
+                // Make sure we don't zoom beyond limits
+                currentZoom = Math.max(minZoom, Math.min(currentZoom, maxZoom));
+                
+                applyZoom();
+            }
+            
+            function applyZoom() {
+                // Update the image scale
+                graphImage.style.transform = `scale(${currentZoom})`;
+                
+                // Update display
+                document.getElementById('zoom-level').textContent = `${Math.round(currentZoom * 100)}%`;
+                
+                // Reposition any markers that are on the map
+                updateMarkerPositions();
+            }
+            
+            function updateMarkerPositions() {
+                // Update origin marker
+                visualizeOrigin();
+                
+                // Update waypoint markers
+                document.querySelectorAll('.selection-point').forEach((point) => {
+                    const pointIndex = point.getAttribute('data-index');
+                    if (pointIndex !== null && pointIndex < selectedPoints.length) {
+                        const worldCoord = selectedPoints[pointIndex];
+                        const pixelCoord = worldToPixel(worldCoord.x, worldCoord.y);
+                        point.style.left = pixelCoord.x + 'px';
+                        point.style.top = pixelCoord.y + 'px';
+                        
+                        // Also update the label position
+                        const label = document.querySelector(`.point-label[data-for="${pointIndex}"]`);
+                        if (label) {
+                            label.style.left = (pixelCoord.x + 15) + 'px';
+                            label.style.top = (pixelCoord.y - 10) + 'px';
+                        }
+                    }
+                });
+            }
+            
+            // Modified coordinate conversion functions to account for zoom
+            function pixelToWorld(displayX, displayY) {
+                if (!mapConfig || !graphImage.naturalWidth) return { x: 0, y: 0 };
+                
+                // Account for zoom - unscale the display coordinates
+                const scaledX = displayX / currentZoom;
+                const scaledY = displayY / currentZoom;
+                
+                // Convert to world coordinates normally
+                const worldX = mapConfig.origin[0] + (scaledX * mapConfig.resolution);
+                const worldY = mapConfig.origin[1] + ((graphImage.naturalHeight - scaledY) * mapConfig.resolution);
+                
+                return { x: worldX, y: worldY };
+            }
+            
+            function worldToPixel(worldX, worldY) {
+                if (!mapConfig || !graphImage.naturalWidth) return { x: 0, y: 0 };
+                
+                // Convert world to image coordinates normally
+                const imageX = (worldX - mapConfig.origin[0]) / mapConfig.resolution;
+                const imageY = graphImage.naturalHeight - ((worldY - mapConfig.origin[1]) / mapConfig.resolution);
+                
+                // Apply zoom scale
+                const displayX = imageX * currentZoom;
+                const displayY = imageY * currentZoom;
+                
+                return { x: displayX, y: displayY };
+            }
+            
+            // Update the mouse move handler to show more debug info
+            graphContainer.addEventListener('mousemove', function(event) {
+                if (!graphImage.src || !mapConfig) return;
+                
+                const rect = graphImage.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                
+                // Convert to world coordinates
+                const worldCoords = pixelToWorld(x, y);
+                
+                // Update coordinate display
+                coordinateDisplay.textContent = `X: ${worldCoords.x.toFixed(2)} m, Y: ${worldCoords.y.toFixed(2)} m`;
+            });
+            
+            // Simplified map click handler 
+            graphContainer.addEventListener('click', function(event) {
+                // Only handle clicks directly on the image, not on markers or other elements
+                if (event.target.id !== 'graph-image' || !graphImage.src || !mapConfig) return;
+                
+                // Get position relative to the container (accounting for scroll)
+                const rect = graphContainer.getBoundingClientRect();
+                const clickX = event.clientX - rect.left + graphContainer.scrollLeft;
+                const clickY = event.clientY - rect.top + graphContainer.scrollTop;
+                
+                // Convert to world coordinates
+                const worldCoords = pixelToWorld(clickX, clickY);
+                
+                // Add the point to our selection
+                selectedPoints.push({
+                    x: worldCoords.x,
+                    y: worldCoords.y
+                });
+                
+                // Create visual element for the point
+                const pointElement = document.createElement('div');
+                pointElement.classList.add('selection-point');
+                
+                // Mark first/last point
+                if (selectedPoints.length === 1) {
+                    pointElement.classList.add('start');
+                } else if (selectedPoints.length > 1) {
+                    const previousPointElement = document.querySelector('.selection-point.end');
+                    if (previousPointElement) {
+                        previousPointElement.classList.remove('end');
+                    }
+                    pointElement.classList.add('end');
+                }
+                
+                // Position the element at the click point
+                pointElement.style.left = clickX + 'px';
+                pointElement.style.top = clickY + 'px';
+                
+                // Add a label with the sequence number
+                const index = selectedPoints.length - 1;
+                pointElement.setAttribute('data-index', index);
+                
+                // Create a label element
+                const labelElement = document.createElement('div');
+                labelElement.classList.add('point-label');
+                labelElement.setAttribute('data-for', index);
+                labelElement.textContent = index;
+                labelElement.style.position = 'absolute';
+                labelElement.style.left = (clickX + 15) + 'px';
+                labelElement.style.top = (clickY - 10) + 'px';
+                labelElement.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+                labelElement.style.padding = '2px 6px';
+                labelElement.style.borderRadius = '3px';
+                labelElement.style.fontSize = '12px';
+                labelElement.style.fontWeight = 'bold';
+                labelElement.style.zIndex = '11';
+                
+                // Add debug information
+                pointElement.title = `World: (${worldCoords.x.toFixed(2)}, ${worldCoords.y.toFixed(2)})`;
+                
+                graphContainer.appendChild(pointElement);
+                graphContainer.appendChild(labelElement);
+                
+                // Enable both buttons if we have at least 2 points
+                const hasEnoughPoints = selectedPoints.length >= 2;
+                generateWaypointsBtn.disabled = !hasEnoughPoints;
+            });
+            
+            // Clear all selected points
+            clearPointsBtn.addEventListener('click', function() {
+                // Clear the points
+                selectedPoints = [];
+                const points = document.querySelectorAll('.selection-point');
+                points.forEach(point => point.remove());
+                
+                // Also remove labels
+                const labels = document.querySelectorAll('.point-label');
+                labels.forEach(label => label.remove());
+                
+                // Hide waypoints panel
+                waypointsPanel.style.display = 'none';
+                
+                // Clear the main route image
+                document.getElementById('main-route-image').src = '';
+                const mainErrorElement = document.getElementById('main-route-error');
+                if (mainErrorElement) {
+                    mainErrorElement.style.display = 'none';
+                }
+                
+                // Switch back to map view if in route view
+                if (document.querySelector('.map-tab[data-target="map-view"]').classList.contains('active') === false) {
+                    document.querySelector('.map-tab[data-target="map-view"]').click();
+                }
+                
+                // Update button states
+                updateButtonState();
+            });
+            
+            // Generate waypoints handler
+            generateWaypointsBtn.addEventListener('click', async function() {
+                if (selectedPoints.length < 2) {
+                    alert('Please select at least 2 points on the map');
+                    return;
+                }
+                
+                const requestData = {
+                    points: selectedPoints,
+                    resolution: mapConfig ? mapConfig.resolution : 0.05,
+                    origin: mapConfig ? mapConfig.origin : [0, 0, 0]
+                };
+                
+                try {
+                    const response = await fetch('/generate-waypoints', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(requestData),
+                    });
+                    
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Failed to generate waypoints');
+                    }
+                    
+                    const data = await response.json();
+                    waypointsPanel.style.display = 'block';
+                    waypointsJson.textContent = JSON.stringify(data, null, 2);
+                    
+                    console.log('Generated waypoints:', data);
+                } catch (error) {
+                    console.error('Error generating waypoints:', error);
+                    alert('Error generating waypoints: ' + error.message);
+                }
+            });
+
+            graphImage.onload = function() {
+                console.log(`Image loaded: ${graphImage.naturalWidth}x${graphImage.naturalHeight}`);
+                console.log(`Displayed as: ${graphImage.width || graphImage.clientWidth}x${graphImage.height || graphImage.clientHeight}`);
+                
+                // Set initial zoom to fit the image
+                zoomFit();
+                
+                // Show the map bounds and visualize the origin
+                updateMapConfig();
+                
+                // Enable the clear points button
+                clearPointsBtn.disabled = false;
+            };
+
+            function visualizeOrigin() {
+                // Remove existing origin marker if any
+                const existingOrigin = document.querySelector('.origin-point');
+                if (existingOrigin) {
+                    existingOrigin.remove();
+                }
+                
+                const existingLabel = document.querySelector('.origin-label');
+                if (existingLabel) {
+                    existingLabel.remove();
+                }
+                
+                if (!mapConfig || !graphImage.naturalWidth) return;
+                
+                // Convert origin (0,0) to pixel coordinates
+                // Note: We need to use the actual origin coordinates from mapConfig
+                const originPixel = worldToPixel(0, 0);  // Use (0,0) in world coordinates
+                
+                // Create a visual indicator for the origin
+                const originElement = document.createElement('div');
+                originElement.className = 'origin-point';
+                originElement.style.position = 'absolute';
+                originElement.style.left = originPixel.x + 'px';
+                originElement.style.top = originPixel.y + 'px';
+                originElement.style.width = '10px';
+                originElement.style.height = '10px';
+                originElement.style.backgroundColor = 'blue';
+                originElement.style.border = '2px solid white';
+                originElement.style.borderRadius = '50%';
+                originElement.style.transform = 'translate(-50%, -50%)';
+                originElement.style.zIndex = '10';
+                originElement.title = `Origin (0,0)`;
+                
+                // Add a label next to the origin point
+                const labelElement = document.createElement('div');
+                labelElement.className = 'origin-label';
+                labelElement.style.position = 'absolute';
+                labelElement.style.left = (originPixel.x + 15) + 'px';
+                labelElement.style.top = (originPixel.y - 10) + 'px';
+                labelElement.style.backgroundColor = 'rgba(255,255,255,0.8)';
+                labelElement.style.padding = '2px 5px';
+                labelElement.style.borderRadius = '3px';
+                labelElement.style.fontSize = '12px';
+                labelElement.style.fontWeight = 'bold';
+                labelElement.style.zIndex = '10';
+                labelElement.textContent = 'ORIGIN (0,0)';
+                
+                graphContainer.appendChild(originElement);
+                graphContainer.appendChild(labelElement);
+                
+                // Debug info
+                console.log('Origin visualization:');
+                console.log('World coordinates: (0, 0)');
+                console.log('Pixel coordinates:', originPixel);
+                console.log('Map config origin:', mapConfig.origin);
+                console.log('Current zoom:', currentZoom);
+            }
+            
+            // Update the map config function to show debug info
+            function updateMapConfig() {
+                if (!mapConfig) return;
+                // Visualize the origin point
+                visualizeOrigin();
+            }
+            
+            // Handle window resize which affects coordinate mapping
+            window.addEventListener('resize', function() {
+                // Update the UI after resize
+                if (mapConfig && graphImage.complete) {
+                    console.log("Window resized, updating UI");
+                    console.log(`New display dimensions: ${graphImage.clientWidth}x${graphImage.clientHeight}`);
+                    updateMapConfig();
+                    
+                    // Repositioning existing points based on their world coordinates
+                    document.querySelectorAll('.selection-point').forEach((point, index) => {
+                        if (index < selectedPoints.length) {
+                            const worldCoord = selectedPoints[index];
+                            const pixelCoord = worldToPixel(worldCoord.x, worldCoord.y);
+                            point.style.left = pixelCoord.x + 'px';
+                            point.style.top = pixelCoord.y + 'px';
+                        }
+                    });
+                }
+            });
+
+            // Add event listeners for zoom controls
+            document.getElementById('zoom-in-btn').addEventListener('click', zoomIn);
+            document.getElementById('zoom-out-btn').addEventListener('click', zoomOut);
+            document.getElementById('zoom-fit-btn').addEventListener('click', zoomFit);
+            
+            // Add scroll wheel zooming
+            graphContainer.addEventListener('wheel', function(event) {
+                event.preventDefault();
+                
+                if (event.deltaY < 0) {
+                    zoomIn();
+                } else {
+                    zoomOut();
+                }
+            });
+
+            // Enable/disable visualize route button together with generate waypoints button
+            function updateButtonState() {
+                const hasEnoughPoints = selectedPoints.length >= 2;
+                generateWaypointsBtn.disabled = !hasEnoughPoints;
+                visualizeRouteBtn.disabled = !hasEnoughPoints || !mapConfig;
+            }
+            
+            // Update all click handlers to call updateButtonState instead of directly setting button state
+            graphContainer.addEventListener('click', function(event) {
+                // Existing click handler code...
+                
+                // After adding a point, update button states
+                updateButtonState();
+            });
+            
+            // Map/Route tab switching
+            document.querySelectorAll('.map-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // Update active tab
+                    document.querySelectorAll('.map-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show the corresponding view
+                    const targetView = this.getAttribute('data-target');
+                    document.querySelectorAll('.map-view').forEach(view => {
+                        view.style.display = 'none';
+                    });
+                    document.getElementById(targetView).style.display = 'block';
+                });
+            });
+
+            // Update the visualize route handler to only show the route in the main view tab
+            visualizeRouteBtn.addEventListener('click', async function() {
+                if (selectedPoints.length < 2) {
+                    alert('Please select at least 2 points on the map');
+                    return;
+                }
+                
+                try {
+                    // Show loading indicator
+                    visualizeRouteBtn.disabled = true;
+                    visualizeRouteBtn.textContent = 'Loading...';
+                    
+                    const response = await fetch('/visualize-route', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(selectedPoints)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Failed to visualize route: ${response.statusText}`);
+                    }
+                    
+                    // Check content type of the response
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        // This is an error message in JSON format
+                        const errorData = await response.json();
+                        
+                        // Create or update error message element in the route view
+                        let errorElement = document.getElementById('main-route-error');
+                        if (!errorElement) {
+                            errorElement = document.createElement('div');
+                            errorElement.id = 'main-route-error';
+                            errorElement.style.padding = '20px';
+                            errorElement.style.backgroundColor = '#fff3f3';
+                            errorElement.style.border = '1px solid #ffcaca';
+                            errorElement.style.borderRadius = '4px';
+                            errorElement.style.color = '#d32f2f';
+                            errorElement.style.margin = '20px';
+                            document.querySelector('.route-container').appendChild(errorElement);
+                        }
+                        
+                        errorElement.innerHTML = `<p><strong>Mission Control Service Error:</strong></p><p>${errorData.message}</p>`;
+                        errorElement.style.display = 'block';
+                        document.getElementById('main-route-image').style.display = 'none';
+                        
+                    } else {
+                        // This is an image
+                        const blob = await response.blob();
+                        const imageUrl = URL.createObjectURL(blob);
+                        
+                        // Hide any error message
+                        const errorElement = document.getElementById('main-route-error');
+                        if (errorElement) {
+                            errorElement.style.display = 'none';
+                        }
+                        
+                        // Display the image
+                        const mainRouteImage = document.getElementById('main-route-image');
+                        mainRouteImage.src = imageUrl;
+                        mainRouteImage.style.display = 'block';
+                    }
+                    
+                    // Switch to the route tab
+                    document.querySelector('.map-tab[data-target="route-view"]').click();
+                    
+                } catch (error) {
+                    console.error('Error visualizing route:', error);
+                    alert('Error visualizing route: ' + error.message);
+                } finally {
+                    // Reset button state
+                    visualizeRouteBtn.disabled = false;
+                    visualizeRouteBtn.textContent = 'Visualize Route';
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

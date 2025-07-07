@@ -1,0 +1,8 @@
+__pycache__
+bazel-*
+.vscode
+*sqlite
+config/data/
+*.tgz
+*.DS_Store
+.test_tmp/

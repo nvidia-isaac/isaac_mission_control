@@ -1,0 +1,80 @@
+# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+robots:
+  - name: "carter01"
+    labels: ["test", "carter", "ros"]
+    heartbeat_timeout: 30
+
+services:
+  waypoint_graph:
+    base_url: "http://127.0.0.1:8000"
+  mission_database:
+    base_url: "http://127.0.0.1:5003"
+  mission_dispatch:
+    base_url: "http://127.0.0.1:5002"
+    default_mission_timeout: 900
+  cuopt:
+    base_url: "http://127.0.0.1:5050"
+    solve_parameters:
+      time_limit: .5
+      verbose_mode: False
+
+map:
+  # One and only one of map_file, map_uri, or map_s3 must be set
+  map_file: "./app/config/maps/carter_warehouse_navigation.png"
+  # map_uri: ""
+  # map_s3:
+
+  metadata_yaml: ""
+  metadata:
+    map_id: "carter_warehouse_navigation"
+    resolution: 0.05
+    occupancy_threshold: 206
+    x_offset: -11.975
+    y_offset: -17.975
+    rotation: 0.0
+    safety_distance: 0.45
+  push_map_on_startup: False
+  save_route_visualization: False
+
+  # docks:
+  #   - dock_id: dock01
+  #     dock_type: nova_carter_dock
+  #     dock_pose:
+  #       x: 0
+  #       y: 0
+  #       yaw: 0
+  
+constants:
+  MIN_BATTERY: 0.0
+
+telemetry:
+  SEND_TELEMETRY: False
+  TELEMETRY_ID: ""
+  TELEMETRY_SECRET: ""
+  TELEMETRY_ENV: "DEV" # {DEV | TEST | PROD}
+
+s3:
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_REGION: ""
+  AWS_ENDPOINT_URL: ""
+
+sap:
+  # Enable/disable SAP EWM background order processing
+  enable_sap_ewm: False
+  # Base URL for SAP EWM API endpoint (e.g., "https://sap-ewm.example.com:50000")
+  base_url: ""
+  # Warehouse identifier in SAP EWM system
+  warehouse: ""
+  # SAP EWM API authentication credentials
+  username: ""
+  password: ""
+  # Maximum number of orders to process (0 = unlimited)
+  max_orders_to_process: 1

@@ -1,0 +1,79 @@
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+# Base configuration file for all tests
+# Test-specific overrides are in test_overrides.yaml
+
+robots:
+  - name: "robot_a"
+    labels: ["test", "carter", "ros"]
+    heartbeat_timeout: 30
+    battery:
+      critical_level: 10
+  - name: "robot_b"
+    labels: ["test", "carter", "ros"]
+    heartbeat_timeout: 30
+  - name: "robot_c"
+    labels: ["test", "carter", "ros"]
+    heartbeat_timeout: 30
+
+services:
+  waypoint_graph:
+    base_url: "http://127.0.0.1:8000"
+  mission_database:
+    base_url: "http://127.0.0.1:5003"
+  mission_dispatch:
+    base_url: "http://127.0.0.1:5002"
+    default_mission_timeout: 900
+  cuopt:
+    base_url: "http://127.0.0.1:5050"
+    solve_parameters:
+      time_limit: .5
+      verbose_mode: False
+
+map:
+  map_file: "/config/maps/test.png"
+  metadata:
+    map_id: "large_warehouse_navigation"
+    resolution: 0.1
+    occupancy_threshold: 129
+    x_offset: 0.0
+    y_offset: 0.0
+    rotation: 0.0
+    safety_distance: 0.45
+  push_map_on_startup: False
+  save_route_visualization: False
+  route_visualization_path: "/tmp/config/routes/"
+
+constants:
+  MIN_BATTERY: 0.0
+  BATTERY_ALERT_URL: ""
+  PROXIMITY_THRESHOLD: 2.0
+  SCALING_FACTOR: 1.0
+  SEND_TELEMETRY: False
+
+telemetry:
+  SEND_TELEMETRY: False
+  TELEMETRY_ID: ""
+  TELEMETRY_SECRET: ""
+  TELEMETRY_ENV: "DEV"
+  TELEMETRY_ENABLED: False
+
+s3:
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_REGION: ""
+  AWS_ENDPOINT_URL: ""
+
+kafka:
+  push_to_kafka: False
+  kafka_server: "localhost:9092"
+  kafka_producer_topic: "mdx-amr"
+  kafka_place: "city=Santa Clara/building=NVIDIA Voyager/room=Visitor Lobby"
+  kafka_consumer_topic: "test-topic"
+  kafka_consumer_frequency_seconds: 0.5

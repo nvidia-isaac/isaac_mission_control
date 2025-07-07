@@ -1,0 +1,23 @@
+test --test_timeout=1200
+test --test_env=CUDA_VISIBLE_DEVICES=0
+test --test_output=errors
+test --test_env=WORKSPACE
+test --test_env=AWS_ACCESS_KEY_ID
+test --test_env=AWS_SECRET_ACCESS_KEY
+test --test_env=AWS_REGION
+test --test_env=AWS_ENDPOINT_URL
+
+build --cxxopt='-std=c++17' 
+build --remote_timeout=3600
+build --action_env=DOCKER_CLIENT_TIMEOUT=3600
+build --action_env=COMPOSE_HTTP_TIMEOUT=3600
+
+# Use our custom-configured c++ toolchain.
+build:clang_config --crosstool_top=//toolchain:clang_suite
+
+# Use --cpu as a differentiator.
+build:clang_config --cpu=k8
+
+# Use the default Bazel C++ toolchain to build the tools used during the
+# build.
+build:clang_config --host_crosstool_top=@bazel_tools//tools/cpp:toolchain

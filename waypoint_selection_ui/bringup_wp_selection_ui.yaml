@@ -1,0 +1,15 @@
+version: '3'
+services:
+  waypoint_ui:
+    build:
+      context: ..
+      dockerfile: waypoint_selection_ui/Dockerfile
+    network_mode: "host"
+    ports:
+      - "8051:8051"
+    volumes:
+      - ./uploads/maps:/app/uploads/maps
+      - ./uploads/configs:/app/uploads/configs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MISSION_CONTROL_API_URL=http://localhost:8050/api/v1

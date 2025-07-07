@@ -1,0 +1,125 @@
+# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+version: "3.3"
+services:
+  mosquitto:
+    image: ${MOSQUITTO_IMAGE}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        echo "allow_anonymous true" > mosquitto.conf
+        echo "listener ${MQTT_PORT_TCP} 0.0.0.0" >> mosquitto.conf
+        echo "listener ${MQTT_PORT_WEBSOCKET}" >> mosquitto.conf
+        echo "protocol websockets" >> mosquitto.conf
+        mosquitto -c mosquitto.conf
+    network_mode: "host"
+
+  postgres:
+    image: ${POSTGRES_IMAGE}
+    environment:
+      - POSTGRES_USER=${POSTGRES_DATABASE_USERNAME}
+      - POSTGRES_PASSWORD=${POSTGRES_DATABASE_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DATABASE_NAME}
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256
+    ports:
+      - "${POSTGRES_DATABASE_PORT}:${POSTGRES_DATABASE_PORT}"
+    network_mode: "host"
+    volumes:
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    healthcheck:
+      test: pg_isready -U ${POSTGRES_DATABASE_USERNAME}
+      interval: 3s
+      timeout: 10s
+      retries: 5
+
+  robot-simulator:
+    image: nvcr.io/nvidia/isaac/mission-simulator:3.2.0
+    profiles: ["robot-simulator"]
+    network_mode: "host"
+    command: ["--robots", "carter01,-97.0,-97.0"]
+
+  mission-database:
+    image: ${MISSION_DATABASE_IMAGE}
+    command:
+      [
+        "--address",
+        "0.0.0.0",
+        "--port",
+        "${DATABASE_API_PORT}",
+        "--controller_port",
+        "${DATABASE_CONTROLLER_PORT}",
+        "--db_port",
+        "${POSTGRES_DATABASE_PORT}",
+        "--db_name",
+        "${POSTGRES_DATABASE_NAME}",
+        "--db_username",
+        "${POSTGRES_DATABASE_USERNAME}",
+        "--db_password",
+        "${POSTGRES_DATABASE_PASSWORD}",
+      ]
+    network_mode: "host"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mission-dispatch:
+    image: ${MISSION_DISPATCH_IMAGE}
+    command:
+      [
+        "--mqtt_port",
+        "${MQTT_PORT_WEBSOCKET}",
+        "--mqtt_transport",
+        "${MQTT_TRANSPORT}",
+        "--database_url",
+        "http://localhost:${DATABASE_CONTROLLER_PORT}",
+        # "--mission_ctrl_url", "http://localhost:${MC_PORT}",
+      ]
+    network_mode: "host"
+
+  wpg:
+    image: ${WPG_IMAGE}
+    network_mode: "host"
+    command: ["python", "scripts/rest_api.py"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  cuopt:
+    image: ${CUOPT_IMAGE}
+    network_mode: "host"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: ["python", "-m", "cuopt_server.cuopt_service"]
+    environment:
+      - CUOPT_SERVER_PORT=${CUOPT_PORT}
+
+  mission-control:
+    image: ${MISSION_CONTROL_IMAGE}
+    profiles: ["enable_mission_control"]
+    network_mode: "host"
+    depends_on:
+      - mission-database
+      - mission-dispatch
+      - wpg
+      - cuopt
+    command: ["--config", "/tmp/config/defaults.yaml", "--verbose", "INFO"]
+    volumes:
+      - type: bind
+        source: ${CONFIG_DIR}
+        target: /tmp/config/

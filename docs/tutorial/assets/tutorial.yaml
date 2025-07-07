@@ -1,0 +1,43 @@
+# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+robots:
+  - name: "carter01"
+    labels: ["test", "carter", "ros"]
+    heartbeat_timeout: 30
+
+services:
+  waypoint_graph:
+    base_url: "http://127.0.0.1:8000"
+  mission_database:
+    base_url: "http://127.0.0.1:5003"
+  mission_dispatch:
+    base_url: "http://127.0.0.1:5002"
+    default_mission_timeout: 900
+  cuopt:
+    base_url: "http://127.0.0.1:5050"
+    solve_parameters:
+      time_limit: .5
+      verbose_mode: False
+
+map:
+  map_file: "/tmp/config/carter_warehouse_navigation.png"
+  metadata_yaml: "/tmp/config/carter_warehouse_navigation.yaml"
+
+  metadata:
+    safety_distance: 0.8
+  push_map_on_startup: False
+  
+constants:
+  MIN_BATTERY: 0.0
+
+telemetry:
+  SEND_TELEMETRY: False
+  TELEMETRY_ID: ""
+  TELEMETRY_SECRET: ""
+  TELEMETRY_ENV: "DEV" # {DEV | TEST | PROD}
