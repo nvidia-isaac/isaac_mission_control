@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -14,7 +14,7 @@ import mimetypes
 import os
 from typing import Optional
 
-import pydantic
+import pydantic.v1 as pydantic
 import requests
 import yaml
 import numpy as np
@@ -240,6 +240,8 @@ class Constants(pydantic.BaseModel):
     SCALING_FACTOR: float = pydantic.Field(
         1.0, description="It determines how much the edge weight changes by scaling the \
             influence factor.")
+    EXACT_WAYPOINT_SAMPLE_DISTANCE: float = pydantic.Field(
+        1.5, description="Distance threshold in meters to sample nodes for exact waypoint")
     SEND_TELEMETRY: bool = pydantic.Field(
         False, description="Enable submission of telemetry")
 

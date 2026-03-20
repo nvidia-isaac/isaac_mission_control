@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -6,16 +6,24 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("@python_versions//3.10:defs.bzl", compile_pip_requirements = "compile_pip_requirements")
+
+package(default_visibility = ["//visibility:public"])
+
+compile_pip_requirements(
+    name = "python_third_party",
+    src = "requirements.txt",
+    requirements_txt = "requirements_lock.txt",
+)
+
+compile_pip_requirements(
+    name = "python_third_party_linting",
+    src = "requirements_linting.txt",
+    requirements_txt = "requirements_linting_lock.txt",
+)
 
 exports_files([
     "pylintrc",
     "pytype.py",
     "pylint.py",
 ])
-
-container_image(
-    name = "python_base",
-    base = "@loaded_base_docker_image//image",
-    visibility = ["//visibility:public"],
-)

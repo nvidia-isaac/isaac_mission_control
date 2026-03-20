@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -37,7 +37,7 @@ docks:
 # Galileo Hubble test overrides
 galileo_hubble:
   map:
-    map_file: "/config/maps/nvidia_galileo_hubble.png"
+    map_file: "./config/maps/nvidia_galileo_hubble.png"
     metadata:
       map_id: "galileo_hubble"
       resolution: 0.05
@@ -53,14 +53,14 @@ galileo_hubble:
 # Semantic map test overrides
 map_file_semantic:
   map:
-    map_file: "/config/maps/elevator_office_1_semantic_map.json"
+    map_file: "./config/maps/elevator_office_1_semantic_map.json"
     metadata:
       map_id: "elevator_office"
 
 # Semantic map with dock test overrides
 map_file_semantic_with_dock:
   map:
-    map_file: "/config/maps/galileo_with_docking_station_semantic_map.json"
+    map_file: "./config/maps/galileo_with_docking_station_semantic_map.json"
     metadata:
       map_id: "galileo"
     docks:
@@ -94,17 +94,13 @@ robots:
 pickplace:
   robots:
     - name: "robot_a"
-      labels: ["test", "arm", "ros"]
+      labels: ["test", "MANIPULATOR", "ros"]
       heartbeat_timeout: 30
-      battery:
-        critical_level: 15
-        recommended_minimum: 20
-        recommended_maximum: 80
     - name: "robot_b"
-      labels: ["test", "carter", "ros"]
+      labels: ["test", "CARRIER", "ros"]
       heartbeat_timeout: 30
       battery:
         recommended_minimum: 30
     - name: "robot_c"
-      labels: ["test", "arm", "ros"]
+      labels: ["test", "MANIPULATOR", "ros"]
       heartbeat_timeout: 30 

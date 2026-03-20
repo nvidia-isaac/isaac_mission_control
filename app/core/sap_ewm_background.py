@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -13,10 +13,9 @@ import httpx
 import ssl
 from typing import Optional, Dict, Any, List
 from app.api.clients.sap_ewm_client import SapEwmService
-from cloud_common.objects.common import ICSError
+from cloud_common.objects.common import ICSError, Point2D
 from cloud_common.objects.robot import RobotObjectV1
 from app.common.models import MissionData
-from app.common.utils import Point
 
 logger = logging.getLogger("Isaac Mission Control")
 
@@ -140,13 +139,13 @@ class SapEwmBackgroundTask:
 
             # Convert sap_mission directly to MissionData
             mission_data = MissionData(
-                route=[Point(x=point["x"], y=point["y"], z=point.get("z", 0))
+                route=[Point2D(x=point["x"], y=point["y"])
                        for point in sap_mission.get("route", [])]
             )
             logger.debug(f"Converted to Mission Control Data: {mission_data}")
 
             # Submit navigation mission - this will handle robot selection through CUOPT internally
-            result = await self.mc.submit_navigation_mission(str(uuid.uuid4()), mission_data, robot)
+            result = await self.mc.submit_navigation_mission(mission_data, robot)
             logger.debug(f"Navigation mission submitted with result: {result}")
 
             # For the first task in an order, store the assigned robot for subsequent tasks

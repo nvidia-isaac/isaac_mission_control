@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -11,7 +11,7 @@ import logging
 import math
 from typing import List, Optional
 
-import pydantic
+import pydantic.v1 as pydantic
 from scipy.spatial import KDTree
 
 from app.api.clients.base_api_client import BaseAPIClient

@@ -1,6 +1,6 @@
 """
 SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-Copyright (c) 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,10 +20,9 @@ from __future__ import annotations
 from typing import Any, Dict, Union, Optional
 
 import enum
-import pydantic
+import pydantic.v1 as pydantic
 
 from cloud_common.objects import object
-
 
 class ObjectiveStateV1(str, enum.Enum):
     """Enum defining the state of the mission."""
@@ -60,10 +59,16 @@ class ObjectiveNodeType(str, enum.Enum):
     CHARGING = "CHARGING"
     UNDOCK = "UNDOCK"
     PICKPLACE = "PICKPLACE"
+    MULTI_OBJECT_PICKPLACE = "MULTI_OBJECT_PICKPLACE"
     OBJ_DETECTION = "OBJ_DETECTION"
+    APRILTAG_DETECTION = "APRILTAG_DETECTION"
+    SLEEP = "SLEEP"
 
     # DECORATOR types
     RETRY = "RETRY"
+    REPEAT = "REPEAT"
+    CONDITIONAL = "CONDITIONAL"
+    INVERTER = "INVERTER"
 
     @property
     def is_composite(self):
@@ -71,11 +76,15 @@ class ObjectiveNodeType(str, enum.Enum):
 
     @property
     def is_behavior(self):
-        return self in (self.NAVIGATION, self.CHARGING, self.UNDOCK, self.PICKPLACE)
+        return self in (
+            self.NAVIGATION, self.CHARGING, self.UNDOCK, self.PICKPLACE,
+            self.OBJ_DETECTION, self.APRILTAG_DETECTION, self.SLEEP,
+            self.MULTI_OBJECT_PICKPLACE
+        )
 
     @property
     def is_decorator(self):
-        return self in (self.RETRY)
+        return self in (self.RETRY, self.CONDITIONAL, self.INVERTER, self.REPEAT)
 
 
 class ObjectiveNode(pydantic.BaseModel):
@@ -109,6 +118,8 @@ class ObjectiveBehaviorNode(ObjectiveNode):
     parameters: dict
     robot: str = ""  # to be assigned by the ObjectiveServer
     mission_id: str = ""
+    # NEW: Output specification {"vocabulary_key": "context_variable_name"}
+    outputs: Optional[Dict[str, str]] = None
 
     @pydantic.validator("node_type")
     def node_type_validator(cls, value):

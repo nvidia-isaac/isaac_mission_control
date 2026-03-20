@@ -14,8 +14,6 @@ py_library(
     srcs = [
         "mission_control.py",
         "mission_control_config.py",
-        "objective_behavior_tree.py",
-        "objectives.py",
         "robots.py",
         "task.py",
         "sap_ewm_background.py"
@@ -24,6 +22,7 @@ py_library(
     deps = [
         "//app/api",
         "//app/common",
+        "//app/core/objectives",
         "//:cloud_common_objects",
         requirement("httpx"),
         requirement("numpy"),

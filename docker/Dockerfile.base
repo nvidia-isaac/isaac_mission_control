@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,19 +19,27 @@ FROM nvcr.io/nvidia/base/ubuntu:22.04_20240212
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install python
-RUN apt update && \
-    apt install -y ca-certificates curl software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt install -y bash python3.10 python3.10-dev python3.10-distutils
-
-# Create symlinks
-RUN if [ -L /usr/bin/python3 ]; then unlink /usr/bin/python3; fi && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        software-properties-common \
+        gnupg && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        bash \
+        python3.10 \
+        python3.10-dev \
+        python3.10-distutils \
+        python3.10-venv \
+        python3-pip && \
+    if [ -L /usr/bin/python3 ]; then unlink /usr/bin/python3; fi && \
     ln -s /usr/bin/python3.10 /usr/bin/python3 && \
-    ln -s /usr/bin/python3 /usr/bin/python
-
-# Install pip using apt and upgrade
-RUN apt install -y python3.10-venv python3-pip && \
-    python3 -m pip install --upgrade pip
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    PIP_DEFAULT_TIMEOUT=120 \
+    python3 -m pip install --upgrade pip && \
+    rm -rf /var/lib/apt/lists/*
 
 # Verify the installation
 RUN python3 --version

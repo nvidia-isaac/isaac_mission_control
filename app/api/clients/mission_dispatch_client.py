@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -8,13 +8,14 @@
 
 import asyncio
 import enum
+import json
 import time
-
+from typing import Optional
 from httpx import HTTPError
 
 from app.api.clients.base_api_client import BaseAPIClient
 from cloud_common.objects.robot import RobotObjectV1
-from app.common.models import PickPlaceData, NVActionType
+from app.common.models import PickPlaceData, NVActionType, MultiObjectPickPlaceData
 
 
 class MissionDispatchClient(BaseAPIClient):
@@ -57,7 +58,7 @@ class MissionDispatchClient(BaseAPIClient):
                                                  json=data)
 
     async def create_route_mission(self, robot: str, waypoints: list[dict],
-                                   actions: dict[str, list[int]], timeout_s: int):
+                                   actions: dict[str, list[int]], timeout_s: int, mission_id: Optional[str] = None):
         """
         Create a mission following a provided route by building a mission tree and submitting
             the mission.
@@ -94,15 +95,17 @@ class MissionDispatchClient(BaseAPIClient):
         data = {
             "robot": robot,
             "mission_tree": mission_tree,
-            "timeout": timeout_s,
+            "timeout": timeout_s
         }
+        if mission_id:
+            data["name"] = mission_id
         return await self.make_request_with_logs("post", endpoint,
                                                  "Failed to create mission.",
                                                  "Created mission.",
                                                  json=data)
 
     async def create_charging_mission(self, robot: str,
-                                      docking_action: dict, timeout_s: int):
+                                      docking_action: dict, timeout_s: int, mission_id: Optional[str] = None):
         """
         Creates a mission for the robot to go to its charger.
         Input: robot name, route nodes, docking action, timeout in seconds
@@ -122,12 +125,15 @@ class MissionDispatchClient(BaseAPIClient):
             ],
             "timeout": timeout_s
         }
+        if mission_id:
+            data["name"] = mission_id
         return await self.make_request_with_logs("post", endpoint,
                                                  "Failed to create mission.",
                                                  "Created mission.",
                                                  json=data)
 
-    async def create_undock_mission(self, robot: str, timeout_s: int):
+    async def create_undock_mission(self, robot: str, timeout_s: int = 600,
+                                    mission_id: Optional[str] = None):
         self._logger.info("Sending undock mission to Mission Dispatch")
         timeout_s = max(self._config["default_mission_timeout"], timeout_s)
 
@@ -146,14 +152,15 @@ class MissionDispatchClient(BaseAPIClient):
             ],
             "timeout": timeout_s
         }
-        self._logger.debug(data)
+        if mission_id:
+            data["name"] = mission_id
         return await self.make_request_with_logs("post", endpoint,
                                                  "Failed to create mission.",
                                                  "Created mission.",
                                                  json=data)
 
     async def create_pickplace_mission(self, robot: str, pick_place_data: PickPlaceData,
-                                       timeout_s: int):
+                                       timeout_s: int = 600, mission_id: Optional[str] = None):
         self._logger.info("Sending pickplace mission to Mission Dispatch")
         timeout_s = max(self._config["default_mission_timeout"], timeout_s)
 
@@ -181,9 +188,47 @@ class MissionDispatchClient(BaseAPIClient):
             ],
             "timeout": timeout_s
         }
+        if mission_id:
+            data["name"] = mission_id
         return await self.make_request_with_logs("post", endpoint,
                                                  "Failed to create pickplace mission.",
                                                  "Created pickplace mission.",
+                                                 json=data)
+
+    async def create_multi_object_pickplace_mission(self, robot: str,
+                                                    pickplace_data: MultiObjectPickPlaceData,
+                                                    timeout_s: int = 600, mission_id: Optional[str] = None):
+        self._logger.info("Sending multi-object pickplace mission to Mission Dispatch")
+        timeout_s = max(self._config["default_mission_timeout"], timeout_s)
+
+        endpoint_info = self._endpoints["mission"]
+        endpoint = self._base_url + endpoint_info["path"]
+
+        action_params = {
+            "mode": pickplace_data.mode.value,
+            "class_ids": ",".join(pickplace_data.class_ids),
+            "target_poses": json.dumps(pickplace_data.target_poses.dict())
+        }
+
+        data = {
+            "robot": robot,
+            "mission_tree": [
+                {
+                    "action": {
+                        "action_type": "multi_object_pick_and_place",
+                        "action_parameters": action_params
+                    }
+                }
+            ],
+            "timeout": timeout_s
+        }
+
+        if mission_id:
+            data["name"] = mission_id
+        self._logger.debug("Multi-object pickplace mission data: %s", data)
+        return await self.make_request_with_logs("post", endpoint,
+                                                 "Failed to create multi-object pickplace mission.",
+                                                 "Created multi-object pickplace mission.",
                                                  json=data)
 
     async def get_available_objects(self, robot: str):
@@ -212,6 +257,32 @@ class MissionDispatchClient(BaseAPIClient):
 
         return submission
 
+    async def get_available_apriltags(self, robot: str):
+        self._logger.info("Getting available AprilTags from Dispatch")
+
+        endpoint_info = self._endpoints["mission"]
+        endpoint = self._base_url + endpoint_info["path"]
+        action = {
+            "action_type": "get_apriltags",
+            "action_parameters": {}
+        }
+        data = {
+            "robot": robot,
+            "mission_tree": [
+                {
+                    "action": action
+                }
+            ],
+            "timeout": 300  # AprilTag detection might take some time
+        }
+
+        submission = await self.make_request_with_logs("post", endpoint,
+                                                       "Failed to get available AprilTags",
+                                                       "Retrieved available AprilTags.",
+                                                       json=data)
+
+        return submission
+
     async def cancel_mission(self, name: str) -> dict:
         """ Cancel a mission by name from mission database """
         self._logger.info("Cancel mission %s", name)
@@ -229,42 +300,125 @@ class MissionDispatchClient(BaseAPIClient):
             self._logger.warning(exc)
         return cancelled_mission
 
-    async def load_map_action(self, robots: list[RobotObjectV1], map_id: str, timeout_s: int):
-        """ Sends a map loading action for each robot """
+    async def enable_map_action(self, robots: list[RobotObjectV1], map_id: str, map_version: str = "", timeout_s: int = 600):
+        """Trigger *enableMap* instant action on each robot."""
         timeout_s = max(self._config["default_mission_timeout"], timeout_s)
         endpoint = self._base_url + self._endpoints["mission"]["path"]
-        data = {
-            "robot": "",
-            "mission_tree": [
-                {
-                    "name": "map_loading",
-                    "action": {
-                            "action_type": NVActionType.LOAD_MAP,
-                            "action_parameters": {
-                                "map_id": map_id
-                            }
-                    }
-                }
 
-            ],
-            "timeout": timeout_s
+        base_action = {
+            "name": "enable_map",
+            "action": {
+                "action_type": NVActionType.ENABLE_MAP,
+                "action_parameters": {
+                    "mapId": map_id,
+                    "mapVersion": map_version
+                }
+            }
         }
+
         robot_names = [robot.name for robot in robots]
-        robot_coros = []
+        coros = []
         for robot_name in robot_names:
-            data["robot"] = robot_name
-            self._logger.debug(
-                "Post map loading action for robot: %s, \n %s", robot_name, data)
-            error_msg = f"Failed to load map for robot: {robot_name}."
-            success_msg = f"Sent map loading action for robot: {robot_name}."
-            robot_coros.append(self.make_request_with_logs("post", endpoint,
-                                                           error_msg,
-                                                           success_msg,
-                                                           json=data))
-        results = await asyncio.gather(*robot_coros, return_exceptions=True)
-        for result, i in enumerate(results):
-            if isinstance(result, Exception):
-                self._logger.error("Failed to load map for %s", robot_names[i])
+            data = {
+                "robot": robot_name,
+                "mission_tree": [base_action],
+                "timeout": timeout_s
+            }
+            self._logger.debug("Enable map for %s: %s", robot_name, data)
+            coros.append(
+                self.make_request_with_logs(
+                    "post", endpoint,
+                    error_msg=f"Failed to enable map for robot: {robot_name}.",
+                    success_msg=f"Sent enableMap for robot: {robot_name}.",
+                    json=data,
+                )
+            )
+
+        await asyncio.gather(*coros, return_exceptions=True)
+
+    # Backwards-compatibility wrapper
+    async def load_map_action(self, robots: list[RobotObjectV1], map_id: str, timeout_s: int):
+        """Deprecated wrapper calling *enable_map_action*."""
+        await self.enable_map_action(robots, map_id, timeout_s=timeout_s)
+
+    async def download_map_action(
+            self,
+            robots: list[RobotObjectV1],
+            map_id: str, map_version: str = "", map_download_link: str = "",
+            map_hash: str | None = None, timeout_s: int = 600):
+        """Trigger *downloadMap* instant action on each robot."""
+        timeout_s = max(self._config["default_mission_timeout"], timeout_s)
+        endpoint = self._base_url + self._endpoints["mission"]["path"]
+
+        params = {
+            "mapId": map_id,
+            "mapVersion": map_version,
+            "mapDownloadLink": map_download_link
+        }
+        if map_hash is not None:
+            params["mapHash"] = map_hash
+
+        base_action = {
+            "name": "download_map",
+            "action": {
+                "action_type": NVActionType.DOWNLOAD_MAP,
+                "action_parameters": params
+            }
+        }
+
+        coros = []
+        for robot in robots:
+            data = {
+                "robot": robot.name,
+                "mission_tree": [base_action],
+                "timeout": timeout_s
+            }
+            coros.append(
+                self.make_request_with_logs(
+                    "post", endpoint,
+                    error_msg=f"Failed to download map for robot: {robot.name}.",
+                    success_msg=f"Sent downloadMap for robot: {robot.name}.",
+                    json=data,
+                )
+            )
+
+        await asyncio.gather(*coros, return_exceptions=True)
+
+    async def delete_map_action(
+            self, robots: list[RobotObjectV1],
+            map_id: str, map_version: str = "", timeout_s: int = 600):
+        """Trigger *deleteMap* instant action on each robot."""
+        timeout_s = max(self._config["default_mission_timeout"], timeout_s)
+        endpoint = self._base_url + self._endpoints["mission"]["path"]
+
+        base_action = {
+            "name": "delete_map",
+            "action": {
+                "action_type": NVActionType.DELETE_MAP,
+                "action_parameters": {
+                    "mapId": map_id,
+                    "mapVersion": map_version
+                }
+            }
+        }
+
+        coros = []
+        for robot in robots:
+            data = {
+                "robot": robot.name,
+                "mission_tree": [base_action],
+                "timeout": timeout_s
+            }
+            coros.append(
+                self.make_request_with_logs(
+                    "post", endpoint,
+                    error_msg=f"Failed to delete map for robot: {robot.name}.",
+                    success_msg=f"Sent deleteMap for robot: {robot.name}.",
+                    json=data,
+                )
+            )
+
+        await asyncio.gather(*coros, return_exceptions=True)
 
     async def health(self, suppress_error_msg=False):
         endpoint_info = self._endpoints["health"]

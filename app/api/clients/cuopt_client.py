@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -10,8 +10,8 @@ import asyncio
 import json
 import logging
 import time
-import pydantic
-from requests.exceptions import HTTPError
+import pydantic.v1 as pydantic
+from httpx import HTTPError
 from typing import Optional
 
 from app.api.clients.base_api_client import BaseAPIClient
@@ -150,21 +150,43 @@ class CuOptClient(BaseAPIClient):
             start_time = time.time()
             while time.time() - start_time < self._solver_timeout:
                 logger.debug("Polling cuOpt request id %s...", reqId)
-                cuopt_status_response = await self.make_request_with_logs("get", endpoint,
-                                                            "cuOpt solver error",
-                                                            "cuOpt optimized routes obtained")
-                logger.debug("cuOpt status response: %s", cuopt_status_response)
-                if ("response" in cuopt_status_response
-                    and "solver_response" in cuopt_status_response["response"]):
-                    result = cuopt_status_response
-                    return result
+                try:
+                    cuopt_status_response = await self.make_request_with_logs(
+                        "get",
+                        endpoint,
+                        "cuOpt solver error",
+                        "cuOpt optimized routes obtained",
+                        suppress_msg=True,
+                    )
+                    logger.debug("cuOpt status response: %s", cuopt_status_response)
+
+                    # Successful solver response available
+                    if (
+                        cuopt_status_response
+                        and "response" in cuopt_status_response
+                        and "solver_response" in cuopt_status_response["response"]
+                    ):
+                        return cuopt_status_response
+                except HTTPError as err:
+                    # Connection may not be ready yet; log and retry until timeout
+                    logger.debug("cuOpt polling attempt failed: %s", err)
+                except Exception as err:
+                    # Any other error: log and retry
+                    logger.debug("cuOpt polling exception: %s", err)
+
                 await asyncio.sleep(0.5)
-            raise CuOptOptimizationException(f"cuOpt solver timeout after {self._solver_timeout} seconds")
+
+            raise CuOptOptimizationException(
+                f"cuOpt solver timeout after {self._solver_timeout} seconds"
+            )
         except HTTPError as exc:
-            # cuOpt responds with a 409 if the solver can not find a solution
-            if exc.response.status_code == 409:
+            # Catch httpx network and protocol errors so that Mission Control can
+            # gracefully fall back to the CPU-based solver when the cuOpt service
+            # is unavailable.
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            if status_code == 409:
                 raise CuOptOptimizationException(
                     "cuOpt solver error: HTTP 409 : Failed to find solution") from exc
-            else:             # General unknown cuOpt failure
+            else:  # General unknown cuOpt failure
                 raise CuOptOptimizationException(
-                    "Unknown cuOpt HTTPError: " + str(exc.args[0])) from exc
+                    f"Unknown cuOpt HTTPError (status_code={status_code}): {exc}") from exc

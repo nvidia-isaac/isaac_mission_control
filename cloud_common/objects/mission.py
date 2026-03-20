@@ -1,6 +1,6 @@
 """
 SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import datetime
 import enum
 from typing import Any, Dict, List, Optional
 
-import pydantic
+import pydantic.v1 as pydantic
 
 from cloud_common.objects import common, object
 

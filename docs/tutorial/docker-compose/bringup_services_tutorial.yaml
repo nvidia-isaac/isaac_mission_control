@@ -99,7 +99,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    command: ["python", "-m", "cuopt_server.cuopt_service"]
     environment:
       - CUOPT_SERVER_PORT=${CUOPT_PORT}
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -7,15 +7,8 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 import math
-
-from pydantic import BaseModel, Field
-
-
-class Point(BaseModel):
-    """ 3D Point """
-    x: float = Field(title="X coordinate of a point")
-    y: float = Field(title="Y coordinate of a point")
-    z: float = Field(title="Optional Z coordinate of a point", default=0.0)
+from pydantic.v1 import BaseModel, Field
+from cloud_common.objects.common import ICSUsageError, Point2D
 
 
 class Blockage(BaseModel):
@@ -42,7 +35,7 @@ class MissionCtrlError(Exception):
         return self.message
 
 
-def angle_between_points(p1: Point, p2: Point):
+def angle_between_points(p1: Point2D, p2: Point2D):
     """
     Calculate the angle between two points
     """
@@ -50,3 +43,17 @@ def angle_between_points(p1: Point, p2: Point):
     delta_y = p2.y - p1.y
     ret_val = math.atan2(delta_y, delta_x)
     return ret_val
+
+def cos_theta_between_three_points(p1: Point2D, p2: Point2D, p3: Point2D):
+    """
+    Calculate the angle between three points
+    """
+    v1 = (p2.x - p1.x, p2.y - p1.y)
+    v2 = (p3.x - p2.x, p3.y - p2.y)
+    dot = v1[0] * v2[0] + v1[1] * v2[1]
+    magnitude_v1 = math.sqrt(v1[0]**2 + v1[1]**2)
+    magnitude_v2 = math.sqrt(v2[0]**2 + v2[1]**2)
+    if magnitude_v1 == 0 or magnitude_v2 == 0:
+        raise ICSUsageError("Zero vector in cos_theta_between_three_points")
+    cos_theta = dot / (magnitude_v1 * magnitude_v2)
+    return cos_theta

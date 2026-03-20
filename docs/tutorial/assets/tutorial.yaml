@@ -30,7 +30,14 @@ map:
   metadata_yaml: "/tmp/config/carter_warehouse_navigation.yaml"
 
   metadata:
-    safety_distance: 0.8
+    map_id: "galileo_hubble"
+    resolution: 0.05
+    occupancy_threshold: 206
+    x_offset: 0.0
+    y_offset: 0.0
+    rotation: 0.0
+    safety_distance: 0.45
+
   push_map_on_startup: False
   
 constants:

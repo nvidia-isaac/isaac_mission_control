@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -13,6 +13,12 @@ set -e
 if [ ! -d "$HOME/.cache/bazel" ]; then
   # Folder does not exist, so create it
   mkdir "$HOME/.cache/bazel"
+fi
+
+# Create pip-tools cache directory if it doesn't exist
+if [ ! -d "$HOME/.cache/pip-tools" ]; then
+  # Folder does not exist, so create it
+  mkdir "$HOME/.cache/pip-tools"
 fi
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/.. >/dev/null 2>&1 && pwd )"
@@ -38,6 +44,7 @@ docker run -it --rm \
 -v "$HOME/.kube:$HOME/.kube:ro" \
 -v "/etc/timezone:/etc/timezone:ro" \
 -v "$HOME/.cache/bazel:$HOME/.cache/bazel" \
+-v "$HOME/.cache/pip-tools:$HOME/.cache/pip-tools" \
 -v /var/run/docker.sock:/var/run/docker.sock \
 -u $(id -u) \
 --group-add $(getent group docker | cut -d: -f3) \

@@ -1,6 +1,6 @@
 """
 SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,13 +22,8 @@ load("//bzl:python.bzl", "mission_control_py_library")
 
 mission_control_py_library(
     name="cloud_common_objects",
-    srcs=["cloud_common/objects/common.py",
-          "cloud_common/objects/mission.py",
-          "cloud_common/objects/object.py",
-          "cloud_common/objects/robot.py",
-          "cloud_common/objects/detection_results.py",
-          "cloud_common/objects/objective.py"],
-    data=["cloud_common/objects/__init__.py"],
+    srcs=glob(["cloud_common/objects/*.py"]),
+    imports=["."],
     deps=[
         requirement("fastapi"),
         requirement("pydantic")

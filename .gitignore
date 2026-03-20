@@ -6,3 +6,6 @@ config/data/
 *.tgz
 *.DS_Store
 .test_tmp/
+venv/
+.venv/
+*.egg-info/

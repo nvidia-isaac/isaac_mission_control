@@ -13,6 +13,7 @@ from app.api.clients.mission_control_client import MissionControlClient
 from app.api.clients.mission_database_client import MissionDatabaseClient
 from app.tests import test_context
 from app.tests.test_context import TestConfigKey
+from cloud_common.objects.robot import VDA5050AgvClass
 
 
 class TestObjectDetection(unittest.IsolatedAsyncioTestCase):
@@ -28,7 +29,7 @@ class TestObjectDetection(unittest.IsolatedAsyncioTestCase):
     async def test_objectdetection(self):
         """Ensure that pickplace works for manipulator robots"""
         robots = [test_context.RobotInit(
-            "robot_a", 35, 35, battery=100, robot_type="arm")]
+            "robot_a", 35, 35, battery=100, robot_type=VDA5050AgvClass.MANIPULATOR)]
         with test_context.TestContext(
                 config_overrides=test_context.get_test_config(TestConfigKey.PICKPLACE),
                 robots=robots,

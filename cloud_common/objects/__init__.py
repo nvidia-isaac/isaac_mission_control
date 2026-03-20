@@ -1,6 +1,6 @@
 """
 SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,10 +22,11 @@ from cloud_common.objects.mission import MissionObjectV1
 from cloud_common.objects.object import ApiObject, ApiObjectMethod, ObjectLifecycleV1
 from cloud_common.objects.robot import RobotObjectV1
 from cloud_common.objects.detection_results import DetectionResultsObjectV1
+from cloud_common.objects.apriltag_results import AprilTagResultsObjectV1
 from cloud_common.objects.objective import ObjectiveV1
 
 ALL_OBJECTS: list[Type[ApiObject]] = [RobotObjectV1,
-                                      MissionObjectV1, ObjectiveV1, DetectionResultsObjectV1]
+                                      MissionObjectV1, ObjectiveV1, DetectionResultsObjectV1, AprilTagResultsObjectV1]
 
 USER_API_OBJECTS: list[Type[ApiObject]] = [RobotObjectV1, MissionObjectV1]
 

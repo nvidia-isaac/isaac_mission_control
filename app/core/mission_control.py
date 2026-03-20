@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -10,17 +10,19 @@ import asyncio
 import enum
 import json
 import logging
+import math
 import time
 import uuid
 from typing import Optional, Dict, Any
 import boto3
-import pydantic
+import pydantic.v1 as pydantic
 import requests
 import httpx
 import os
 import io
+from fastapi import HTTPException
 from PIL import Image, ImageDraw
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, dok_matrix
 from scipy.sparse.csgraph import dijkstra
 import py_trees
 import app.api.clients.esp_client as esp
@@ -36,8 +38,8 @@ from app.api.clients.s3_client import S3Client
 from app.core.robots import RobotInventory
 from app.core.task import Task
 from app.common.utils import (
-    Point,
     angle_between_points,
+    cos_theta_between_three_points,
 )
 from datetime import datetime
 
@@ -47,15 +49,13 @@ from app.api.clients.waypoint_graph_generator_client import (
 from app.common.waypoint_graph import WaypointGraph
 from app.common.models import (
     MissionData, SolverType, MissionType, MissionDataExtend,
-    PickPlaceData, RouteVisualizationData
+    PickPlaceData, RouteVisualizationData, MultiObjectPickPlaceData
 )
-from app.core.objective_behavior_tree import ObjectiveBehaviorTree, ObjectiveLeafNode
 
 from cloud_common import objects
 from cloud_common.objects.mission import MissionStateV1
-from cloud_common.objects.robot import RobotObjectV1, RobotStateV1
-from cloud_common.objects.common import ICSServerError, ICSUsageError
-from cloud_common.objects.objective import ObjectiveV1, ObjectiveStateV1, ObjectiveNodeType, ObjectiveNode
+from cloud_common.objects.robot import RobotObjectV1, RobotStateV1, VDA5050AgvClass
+from cloud_common.objects.common import ICSServerError, ICSUsageError, Point2D
 
 from app.core.sap_ewm_background import SapEwmBackgroundTask
 
@@ -119,6 +119,10 @@ class MissionControl:
                                   s3_config["AWS_SECRET_ACCESS_KEY"],
                                   s3_config["AWS_REGION"],
                                   s3_config["AWS_ENDPOINT_URL"])
+        
+        # CPU fallback is enabled unless the env-var is explicitly set to "false".
+        self.enable_cpu_fallback = os.getenv("MC_ENABLE_CPU_FALLBACK", "true").lower() == "true"
+        
         self.initialized = False
         MissionControl._instance = self
         
@@ -145,8 +149,6 @@ class MissionControl:
 
         self.wpg_cache = await self.wpg_client.request_new_graph()
 
-        # TODO: Investigate - Creating robots this way will cause missing robots in Dispatch occasionally
-        # results = await self.mission_database_client.create_robots_if_new(self.robots.get_robots())
         results = []
         for robot in self.robots.get_robots():
             new_robot = await self.mission_database_client.create_robot_if_new(robot)
@@ -175,8 +177,8 @@ class MissionControl:
                 self.ota_client.ota_file_upload(
                     map_config.metadata.dict(), map_content=response.content)
             if map_config.push_map_on_startup:
-                await self.mission_dispatch_client.load_map_action(
-                    self.robots.get_robots(), json.dumps([map_config.metadata.map_id]),
+                await self.mission_dispatch_client.enable_map_action(
+                    self.robots.get_robots(), map_id=map_config.metadata.map_id,
                     timeout_s=600)
 
         self.logger.info("Mission Control config:\n"  # pylint: disable=logging-fstring-interpolation
@@ -194,7 +196,14 @@ class MissionControl:
     async def reset_wpg_cache(self):
         self.wpg_cache = await self.wpg_client.request_new_graph()
 
-    async def update_task(self, task: Task, target_locations: list[int]):
+    async def raise_if_mission_exists(self, mission_id: Optional[str] = None):
+        if mission_id is None:
+            return
+        mission_obj = await self.mission_database_client.get_mission(mission_id)
+        if mission_obj:
+            raise HTTPException(status_code=409, detail=f"Mission {mission_id} already exists")
+
+    async def update_task(self, task: Task, target_locations: list[int], end_node: Optional[int] = None):
         """ Prepare tasks using target_location and wpg_cache """
         if None in target_locations:
             self.logger.error("WPG returned None for get_nearest_nodes: "
@@ -212,6 +221,10 @@ class MissionControl:
                 "Target location requested that's out of bounds") from exc
 
         task_nodes = await self.wpg_client.get_nearest_nodes(world_frame_locations)
+
+        # If we are ending on an exact location, we attach the end node directly to bypass WPG
+        if end_node is not None:
+            task_nodes.append(end_node)
         self.logger.debug("Node_locations: %s", str(task_nodes))
 
         max_weight = self.wpg_cache.get_maximum_weight()
@@ -253,14 +266,55 @@ class MissionControl:
         target_locations = await self.wpg_client.get_nearest_nodes(
             [point.dict() for point in assembled_mission.points])
         
+        waypoint_graph = self.wpg_cache
+
+        # If we need to end on exact location, we need to add a new node to the WPG
+        if mission_data.exact_end_location:
+            self.logger.info("Adding exact end location to WPG")
+            tmp_csr = csr_matrix((waypoint_graph.weights, waypoint_graph.edges, waypoint_graph.offsets),
+                           shape=(len(waypoint_graph.nodes), len(waypoint_graph.nodes)))
+            tmp_csr.resize(len(waypoint_graph.nodes) + 1, len(waypoint_graph.nodes) + 1)
+            dok_graph = tmp_csr.todok()
+            x_new = mission_data.end_location.x
+            y_new = mission_data.end_location.y
+            new_connections = []
+            # Find all nodes within EXACT_WAYPOINT_SAMPLE_DISTANCE of the new node
+            # SWAGGER has default sample distance of 1.5
+            for i, node in enumerate(waypoint_graph.nodes):
+                distance = math.sqrt((node["x"] - x_new)**2 + (node["y"] - y_new)**2)
+                if distance <= self.constants.EXACT_WAYPOINT_SAMPLE_DISTANCE:
+                    new_connections.append((i, distance))
+            new_node = len(waypoint_graph.nodes)
+
+            # Add new connections to the graph
+            for node, distance in new_connections:
+                dok_graph[node, new_node] = distance
+                dok_graph[new_node, node] = distance
+            csr_graph = dok_graph.tocsr()
+            new_nodes = waypoint_graph.nodes.copy()
+            new_nodes.append({"x": x_new, "y": y_new, "z": 0.0})
+            waypoint_graph = WaypointGraph(
+                nodes=new_nodes,
+                edges=csr_graph.indices.tolist(),
+                weights=csr_graph.data.tolist(),
+                offsets=csr_graph.indptr.tolist(),
+                map_id=waypoint_graph.map_id
+            )
         self.logger.debug("Target locations: %s", target_locations)
+    
+        if mission_data.exact_end_location:
+            # If we are ending on an exact location, we add the end node directly to the task object in update_task
+            target_locations.pop()
         
         if None in target_locations:
             self.logger.error("WPG returned None for get_nearest_nodes: Non-navigable surface in mission plan")
             raise objects.common.ICSServerError("Non-navigable surface in mission plan")
         
         # Update task with target locations
-        await self.update_task(task, target_locations)
+        if mission_data.exact_end_location:
+            await self.update_task(task, target_locations, end_node=len(waypoint_graph.nodes) - 1)
+        else:
+            await self.update_task(task, target_locations)
         
         # Get available robots
         available_robots = []
@@ -287,31 +341,48 @@ class MissionControl:
         if mission_data.solver == SolverType.NVIDIA_CUOPT:
             robot_locations = [self.robots.get_robot_location(robot.name)
                                for robot in available_robots]
-            ret_val, msg = await self.cuopt_client.optimize_graph(available_robots,
-                                                                 robot_locations,
-                                                                 task,
-                                                                 self.wpg_cache)
+            ret_val, msg = await self.cuopt_client.optimize_graph(
+                available_robots,
+                robot_locations,
+                task,
+                waypoint_graph)
+
+            # If cuOpt failed (e.g., service unavailable)
+            if ret_val is False:
+                if self.enable_cpu_fallback:
+                    self.logger.error(
+                        "cuOpt solver failed (%s). Falling back to CPU_DIJKSTRA solver.",
+                        msg)
+                    mission_data.solver = SolverType.CPU_DIJKSTRA
+                    ret_val = True
+                    msg = self.optimize_graph_cpu(
+                        available_robots, task, waypoint_graph)
+                else:
+                    self.logger.error(
+                        "cuOpt solver failed (%s) and CPU fallback is disabled.", msg)
+                    raise objects.common.ICSServerError(f"cuOpt solver failed: {msg}")
         elif mission_data.solver == SolverType.CPU_DIJKSTRA:
             msg = self.optimize_graph_cpu(
-                available_robots, task, self.wpg_cache)
+                available_robots, task, waypoint_graph)
         else:
             raise objects.common.ICSUsageError("Unknown Optimizer requested")
         
         self.logger.debug("Route calculation result: %s", msg)
         
-        return ret_val, msg, target_locations, assembled_mission
+        return ret_val, msg, target_locations, assembled_mission, waypoint_graph
 
-    async def submit_navigation_mission(self, mission_id: str,
+    async def submit_navigation_mission(self,
                                       mission_data: MissionData,
-                                      mandatory_robot: Optional[RobotObjectV1] = None):
+                                      mandatory_robot: Optional[RobotObjectV1] = None,
+                                      mission_id: Optional[str] = None):
         """ Create a new mission and execute it """
+        await self.raise_if_mission_exists(mission_id)
+
         t_start = datetime.now()
-        self.logger.debug("Received new mission:\n %s \n %s \n", mission_id,
-                          mission_data)
 
         # Use common route calculation logic
         try:
-            ret_val, msg, target_locations, assembled_mission = await self._calculate_route(
+            ret_val, msg, target_locations, assembled_mission, waypoint_graph = await self._calculate_route(
                 mission_data, mandatory_robot)
             
             self.telemetry.add_kpi(name="number_of_target_locations",
@@ -320,7 +391,7 @@ class MissionControl:
             if ret_val is True:
                 msg["actions"] = assembled_mission.actions
                 tmp_m_create = await self._create_missions(
-                    msg, self.wpg_cache, mission_data, MissionType.SIMPLE_NAVIGATION, mission_id)
+                    msg, waypoint_graph, mission_data, MissionType.SIMPLE_NAVIGATION, mission_id)
                 t_end = datetime.now()
                 t_diff = t_end - t_start
 
@@ -365,7 +436,7 @@ class MissionControl:
                                      })
                     except Exception as e:  # pylint: disable=broad-except
                         self.logger.error("Error when uploading metrics: %s", e)
-                raise objects.common.ICSServerError("Mission not accepted: "+msg)
+                raise objects.common.ICSServerError("Mission not accepted: " + str(msg))
         except Exception as e:
             t_end = datetime.now()
             t_diff = t_end - t_start
@@ -387,10 +458,12 @@ class MissionControl:
             self.logger.error("Error calculating route: %s", str(e))
             raise e
 
-    async def submit_charging_mission(self, mission_id: str,
+    async def submit_charging_mission(self,
                                       robot: RobotObjectV1,
-                                      dock_id: Optional[str] = None):
+                                      dock_id: Optional[str] = None,
+                                      mission_id: Optional[str] = None):
         """ Create a new charging mission and execute it """
+        await self.raise_if_mission_exists(mission_id)
 
         self.logger.info("Creating charging mission")
         map_config = self.config.get_map_config()
@@ -400,7 +473,7 @@ class MissionControl:
         robot_to_charge = await self.update_robot_nodes([robot_from_db])
         robot_location = [self.robots.get_robot_location(robot_to_charge[0].name)]
 
-        mission_data = MissionData(route=[Point(x=robot_from_db.status.pose.x,
+        mission_data = MissionData(route=[Point2D(x=robot_from_db.status.pose.x,
                                                 y=robot_from_db.status.pose.y)])
 
         task = Task()
@@ -454,6 +527,24 @@ class MissionControl:
                         ),
                         timeout=30  # Set a reasonable timeout (adjust as needed)
                     )
+
+                    # Graceful fallback to CPU solver if cuOpt failed
+                    if ret_val is False:
+                        if self.enable_cpu_fallback:
+                            self.logger.error(
+                                "cuOpt solver failed for charging mission (%s). "
+                                "Falling back to CPU_DIJKSTRA.",
+                                msg)
+                            mission_data.solver = SolverType.CPU_DIJKSTRA
+                            ret_val = True
+                            msg = self.optimize_graph_cpu(
+                                robot_to_charge, task, self.wpg_cache)
+                        else:
+                            self.logger.error(
+                                "cuOpt solver failed for charging mission (%s) "
+                                "and CPU fallback is disabled.",
+                                msg)
+                            raise ICSServerError(f"cuOpt solver failed: {msg}")
                 elif mission_data.solver == SolverType.CPU_DIJKSTRA:
                     ret_val = True
                     msg = self.optimize_graph_cpu(
@@ -466,9 +557,19 @@ class MissionControl:
                 self.logger.info(f"Optimization result: {ret_val}")
                 self.logger.info(f"Optimization message: {msg}")
             except asyncio.TimeoutError:
+                # Handle cuOpt timeouts similarly to generic solver failures, with optional CPU fallback
                 self.logger.error(
                     f"Optimization timed out after {time.time() - start_time:.2f} seconds")
-                raise ICSServerError("Route optimization for charging mission timed out.")
+                if self.enable_cpu_fallback:
+                    self.logger.error(
+                        "cuOpt solver timed out for charging mission. Falling back to CPU_DIJKSTRA.")
+                    # Switch the solver and run the CPU optimisation path
+                    mission_data.solver = SolverType.CPU_DIJKSTRA
+                    ret_val = True
+                    msg = self.optimize_graph_cpu(
+                        robot_to_charge, task, self.wpg_cache)
+                else:
+                    raise ICSServerError("Route optimization for charging mission timed out.")
             except Exception as e:
                 self.logger.error(f"Optimization failed with exception: {str(e)}")
                 self.logger.error(f"Exception details:", exc_info=True)
@@ -493,20 +594,21 @@ class MissionControl:
             return await self._create_missions(
                 msg, self.wpg_cache, mission_data, MissionType.CHARGING, mission_id)
         else:
-            raise ValueError("Mission not accepted: "+msg)
+            raise ValueError("Mission not accepted: " + str(msg))
 
-
-    async def submit_pickplace_mission(self, mission_id: str,
-                                       robot: RobotObjectV1, pick_place_data: PickPlaceData):
+    async def submit_pickplace_mission(self, robot: RobotObjectV1, pick_place_data: PickPlaceData,
+                                       mission_id: Optional[str] = None):
         """ Create a new pick and place mission and execute it """
+        await self.raise_if_mission_exists(mission_id)
+
         self.logger.info("Creating pickplace mission")
         db_robot = await self.mission_database_client.get_robot(robot.name)
         if not db_robot:
             raise ICSUsageError(f"No robot named {robot.name}")
         if not db_robot.status.online:
             raise ICSServerError(f"Robot {robot.name} is not online")
-        if db_robot.status.factsheet.agv_class != "FORKLIFT":
-            raise ICSUsageError(f"Robot {robot.name} is not an arm.")
+        if db_robot.status.factsheet.agv_class != VDA5050AgvClass.MANIPULATOR.value:
+            raise ICSUsageError(f"Robot {robot.name} is not a manipulator.")
         mission_data = MissionData(route=[])
         mission_data_extend = MissionDataExtend(**mission_data.dict())
         submission = await self.mission_dispatch_client.create_pickplace_mission(
@@ -515,8 +617,9 @@ class MissionControl:
         mission_data_extend.robots.append(robot.name)
         return mission_data_extend
 
-    async def submit_undock_mission(self, robot: RobotObjectV1):
+    async def submit_undock_mission(self, robot: RobotObjectV1, mission_id: Optional[str] = None):
         """ Create a new undock mission and execute it """
+        await self.raise_if_mission_exists(mission_id)
         self.logger.info("Creating undock mission")
 
         db_robot = await self.mission_database_client.get_robot(robot.name)
@@ -530,13 +633,63 @@ class MissionControl:
         mission_data = MissionData(route=[])
         mission_data_extend = MissionDataExtend(**mission_data.dict())
         submission = await self.mission_dispatch_client.create_undock_mission(
-            robot.name, timeout_s=mission_data.timeout)
+            robot.name, timeout_s=mission_data.timeout, mission_id=mission_id)
+        mission_data_extend.sub_mission_uuids.append(submission["name"])
+        mission_data_extend.robots.append(robot.name)
+        return mission_data_extend
+
+    async def submit_obj_detection_mission(self, robot: RobotObjectV1):
+        """ Create a new object detection mission and execute it """
+        self.logger.info("Creating object detection mission")
+        
+        db_robot = await self.mission_database_client.get_robot(robot.name)
+        if not db_robot or not db_robot.status.online:
+            raise ValueError(f"Robot {robot.name} is not available")
+        
+        submission = await self.mission_dispatch_client.get_available_objects(robot.name)
+        mission_data_extend = MissionDataExtend(route=[])
+        mission_data_extend.sub_mission_uuids.append(submission["name"])
+        mission_data_extend.robots.append(robot.name)
+        return mission_data_extend
+
+    async def submit_apriltag_detection_mission(self, robot: RobotObjectV1):
+        """ Create a new AprilTag detection mission and execute it """
+        self.logger.info("Creating AprilTag detection mission")
+        
+        db_robot = await self.mission_database_client.get_robot(robot.name)
+        if not db_robot or not db_robot.status.online:
+            raise ValueError(f"Robot {robot.name} is not available")
+        
+        submission = await self.mission_dispatch_client.get_available_apriltags(robot.name)
+        mission_data_extend = MissionDataExtend(route=[])
+        mission_data_extend.sub_mission_uuids.append(submission["name"])
+        mission_data_extend.robots.append(robot.name)
+        return mission_data_extend
+
+    async def submit_multi_object_pickplace_mission(self,
+                                                    robot: RobotObjectV1,
+                                                    multi_object_pickplace_data: MultiObjectPickPlaceData,
+                                                    mission_id: Optional[str] = None):
+        """ Create a new multi-object pick and place mission and execute it """
+        await self.raise_if_mission_exists(mission_id)
+        self.logger.info("Creating multi-object pickplace mission")
+        db_robot = await self.mission_database_client.get_robot(robot.name)
+        if not db_robot:
+            raise ICSUsageError(f"No robot named {robot.name}")
+        if not db_robot.status.online:
+            raise ICSServerError(f"Robot {robot.name} is not online")
+        if db_robot.status.factsheet.agv_class != VDA5050AgvClass.MANIPULATOR.value:
+            raise ICSUsageError(f"Robot {robot.name} is not a manipulator.")
+        mission_data = MissionData(route=[])
+        mission_data_extend = MissionDataExtend(**mission_data.dict())
+        submission = await self.mission_dispatch_client.create_multi_object_pickplace_mission(
+            robot.name, multi_object_pickplace_data, 600)
         mission_data_extend.sub_mission_uuids.append(submission["name"])
         mission_data_extend.robots.append(robot.name)
         return mission_data_extend
 
     async def _create_missions(self, msg: dict, graph: WaypointGraph, mission_data: MissionData,
-                               mission_type: MissionType, mission_id: str):
+                               mission_type: MissionType, mission_id: Optional[str] = None):
         """ Create Behavior trees and send to Mission Dispatch """
         vehicle_data = msg["vehicle_data"]
         self.logger.debug("Vehicle_data: %s", str(vehicle_data))
@@ -545,12 +698,16 @@ class MissionControl:
 
         for robot, mission in vehicle_data.items():
             waypoints = []
-            from_node = Point(x=0, y=0, z=0)
+            from_node = Point2D(x=0, y=0)
             for i, node in enumerate(mission["route"]):
-                to_node = Point(x=nodes[node]["x"],
-                                y=nodes[node]["y"],
-                                z=0)
-                theta = round(angle_between_points(from_node, to_node), 4)
+                to_node = Point2D(x=nodes[node]["x"],
+                                y=nodes[node]["y"])
+                if (mission_data.exact_end_location
+                    and i == len(mission["route"]) - 1
+                    and mission_data.end_location.theta):
+                    theta = mission_data.end_location.theta
+                else:
+                    theta = round(angle_between_points(from_node, to_node), 4)
                 waypoints.append(objects.common.Pose2D(
                     x=nodes[node]["x"],
                     y=nodes[node]["y"],
@@ -562,12 +719,23 @@ class MissionControl:
             if len(waypoints) > 1:
                 waypoints[0]["theta"] = waypoints[1]["theta"]
 
+            # Check if we are backtracking
+            # Using the last 3 waypoints, if 90deg < theta < 270deg, we are backtracking
+            if mission_data.exact_end_location and len(waypoints) >= 3:
+                p1 = Point2D(x=waypoints[-3]["x"], y=waypoints[-3]["y"])
+                p2 = Point2D(x=waypoints[-2]["x"], y=waypoints[-2]["y"])
+                p3 = Point2D(x=waypoints[-1]["x"], y=waypoints[-1]["y"])
+                cos_theta = cos_theta_between_three_points(p1, p2, p3)
+                if cos_theta < 0:
+                    self.logger.debug("Backtracking detected, removing waypoint. cos_theta: %s", cos_theta)
+                    waypoints.pop(-2)
+
             if mission_type == MissionType.SIMPLE_NAVIGATION:
                 submission = await self.mission_dispatch_client.create_route_mission(
-                    robot, waypoints, msg["actions"], timeout_s=mission_data.timeout)
+                    robot, waypoints, msg["actions"], timeout_s=mission_data.timeout, mission_id=mission_id)
             elif mission_type == MissionType.CHARGING:
                 submission = await self.mission_dispatch_client.create_charging_mission(
-                    robot, msg["dockingAction"], timeout_s=mission_data.timeout)
+                    robot, msg["dockingAction"], timeout_s=mission_data.timeout, mission_id=mission_id)
                 dock_id = msg["dockingAction"]["action_parameters"]["dock_id"]
                 mission_data_extend.docks.append(dock_id)
             else:
@@ -712,9 +880,9 @@ class MissionControl:
         # Robots from database are returned as dicts
         db_robot = await self.mission_database_client.get_robot(robot.name)
         if not db_robot:
-            raise ValueError(f"No robot named {robot.name}")
+            raise ICSUsageError(f"No robot named {robot.name}")
         if not db_robot.status.online:
-            raise ValueError(f"Robot {robot.name} is not online")
+            raise ICSUsageError(f"Robot {robot.name} is not online")
 
         submission = await self.mission_dispatch_client.get_available_objects(
             robot.name)
@@ -732,6 +900,33 @@ class MissionControl:
             robot.name)
 
         return detector.status.detected_objects
+
+    async def get_available_apriltags(self, robot: RobotObjectV1):
+        """ Get available AprilTags pertaining to selected robot """
+        self.logger.debug("Getting available AprilTags")
+        # Robots from database are returned as dicts
+        db_robot = await self.mission_database_client.get_robot(robot.name)
+        if not db_robot:
+            raise ICSUsageError(f"No robot named {robot.name}")
+        if not db_robot.status.online:
+            raise ICSUsageError(f"Robot {robot.name} is not online")
+
+        submission = await self.mission_dispatch_client.get_available_apriltags(
+            robot.name)
+
+        self.logger.info(
+            "Waiting for available AprilTags to be retrieved from client.")
+
+        mission_name = submission["name"]
+        mission_completed = await self.wait_for_mission(mission_name)
+        if not mission_completed:
+            self.logger.error("AprilTag detection error")
+            raise ICSServerError("AprilTag detection mission failed.")
+
+        detector = await self.mission_database_client.get_apriltag_results(
+            robot.name)
+
+        return detector.status.detected_apriltags
 
     # Change to use watch API?
     async def wait_for_mission(self, mission_name: str) -> bool:
@@ -770,7 +965,7 @@ class MissionControl:
             if robots:
                 mandatory_robot = robots[0]
             
-            ret_val, msg, _, assembled_mission = await self._calculate_route(
+            ret_val, msg, _, assembled_mission, waypoint_graph = await self._calculate_route(
                 mission_data, mandatory_robot)
             
             if not ret_val:
@@ -778,7 +973,7 @@ class MissionControl:
                 raise ICSServerError(f"Route optimization failed: {msg}")
             
             # Get the node coordinates from the WPG cache
-            node_locations = self.wpg_cache.nodes
+            node_locations = waypoint_graph.nodes
             
             # Extract the route path based on solver type
             route_path = []
@@ -790,12 +985,11 @@ class MissionControl:
             # Convert route nodes to path points
             for node in route_nodes:
                 node_data = node_locations[node]
-                route_path.append(Point(
+                route_path.append(Point2D(
                     x=node_data["x"],
-                    y=node_data["y"],
-                    z=0
+                    y=node_data["y"]
                 ))
-            
+
             # Create and return the visualization data
             return RouteVisualizationData(
                 waypoints=assembled_mission.points,

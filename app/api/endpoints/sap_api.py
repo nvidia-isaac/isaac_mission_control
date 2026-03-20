@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -12,11 +12,13 @@ import ssl
 import httpx
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from app.core.mission_control import MissionControl
-from app.common.models import MissionData, Point, WarehouseOrderStatus
+from app.common.models import MissionData, WarehouseOrderStatus
 from app.api.clients.sap_ewm_client import SapEwmService
+
+from cloud_common.objects.common import Point2D
 
 logger = logging.getLogger("Isaac Mission Control")
 router = APIRouter(prefix="/sap", tags=["SAP"])
@@ -160,12 +162,12 @@ async def submit_mission_from_task(
 
         # Convert sap_mission to MissionData
         mission_data = MissionData(
-            route=[Point(x=point["x"], y=point["y"], z=point.get("z", 0))
+            route=[Point2D(x=point["x"], y=point["y"])
                    for point in sap_mission.get("route", [])]
         )
 
         # Submit mission
-        result = await mc.submit_navigation_mission(str(uuid.uuid4()), mission_data)
+        result = await mc.submit_navigation_mission(mission_data)
 
         return {
             "mission": sap_mission,

@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -7,7 +7,7 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 load("//bzl:python.bzl", "mission_control_py_library")
-load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
 mission_control_py_library(
     name = "test_utils",
@@ -19,78 +19,100 @@ mission_control_py_library(
     visibility = ["//visibility:public"],
 )
 
-container_image(
+oci_image(
     name = "mosquitto-img",
-    base = "@mosquitto_base//image",
+    base = "@mosquitto_base",
     entrypoint = [
         "sh",
-        "mosquitto.sh",
+        "/mosquitto.sh",
     ],
-    files = [
-        "mosquitto.sh",
-    ],
+    tars = [":mosquitto-files-layer"],
 )
 
-container_bundle(
+# Create a tar layer for mosquitto files
+genrule(
+    name = "mosquitto-files-layer",
+    srcs = ["mosquitto.sh"],
+    outs = ["mosquitto-files.tar"],
+    cmd = "tmpdir=$$(mktemp -d) && cp $(SRCS) $$tmpdir/ && tar -czf $@ -C $$tmpdir . && rm -rf $$tmpdir",
+)
+
+oci_load(
     name = "mosquitto-img-bundle",
-    images = {
-        "bazel-image": ":mosquitto-img",
-    },
+    image = ":mosquitto-img",
+    repo_tags = ["bazel/app/tests/test_utils/mosquitto:latest"],
     visibility = ["//visibility:public"],
 )
 
-container_bundle(
+oci_image(
+    name = "postgres-database-img",
+    base = "@postgres_database_base",
+    visibility = ["//visibility:public"],
+)
+
+oci_load(
     name = "postgres-database-img-bundle",
-    images = {
-        "bazel-image": "@postgres_database_base//image",
-    },
+    image = ":postgres-database-img",
+    repo_tags = ["bazel/app/tests/test_utils/postgres-database:latest"],
     visibility = ["//visibility:public"],
 )
 
-container_bundle(
+oci_image(
+    name = "mission-simulator-img",
+    base = "@mission_simulator_base",
+    visibility = ["//visibility:public"],
+)
+oci_load(
     name = "mission-simulator-img-bundle",
-    images = {
-        "bazel-image": "@mission_simulator_base//image",
-    },
+    image = ":mission-simulator-img",
+    repo_tags = ["bazel/app/tests/test_utils/mission-simulator:latest"],
     visibility = ["//visibility:public"],
 )
 
-container_bundle(
+oci_image(
+    name = "mission-dispatch-img",
+    base = "@mission_dispatch_base",
+    visibility = ["//visibility:public"],
+)
+oci_load(
     name = "mission-dispatch-img-bundle",
-    images = {
-        "bazel-image": "@mission_dispatch_base//image",
-    },
+    image = ":mission-dispatch-img",
+    repo_tags = ["bazel/app/tests/test_utils/mission-dispatch:latest"],
     visibility = ["//visibility:public"],
 )
 
-container_bundle(
+oci_image(
+    name = "mission-database-img",
+    base = "@mission_database_base",
+    visibility = ["//visibility:public"],
+)
+oci_load(
     name = "mission-database-img-bundle",
-    images = {
-        "bazel-image": "@mission_database_base//image",
-    },
+    image = ":mission-database-img",
+    repo_tags = ["bazel/app/tests/test_utils/mission-database:latest"],
     visibility = ["//visibility:public"],
 )
 
-container_bundle(
+oci_image(
+    name = "waypoint-graph-generator-img",
+    base = "@waypoint_graph_generator_base",
+    visibility = ["//visibility:public"],
+)
+oci_load(
     name = "waypoint-graph-generator-img-bundle",
-    images = {
-        "bazel-image": "@waypoint_graph_generator_base//image",
-    },
+    image = ":waypoint-graph-generator-img",
+    repo_tags = ["bazel/app/tests/test_utils/waypoint-graph-generator:latest"],
     visibility = ["//visibility:public"],
 )
 
-container_bundle(
-    name = "ota-file-service-img-bundle",
-    images = {
-        "bazel-image": "@ota_file_service_base//image",
-    },
+oci_image(
+    name = "cuopt-img",
+    base = "@cuopt_base",
     visibility = ["//visibility:public"],
 )
-
-container_bundle(
+oci_load(
     name = "cuopt-img-bundle",
-    images = {
-        "bazel-image": "@cuopt_base//image",
-    },
+    image = ":cuopt-img",
+    repo_tags = ["bazel/app/tests/test_utils/cuopt:latest"],
     visibility = ["//visibility:public"],
 )

@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional
 import logging
 
-from pydantic import BaseModel, Field
+from pydantic.v1 import BaseModel, Field
 
 from app.api.clients.base_api_client import BaseAPIClient
 

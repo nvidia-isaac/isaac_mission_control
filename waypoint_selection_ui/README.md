@@ -26,7 +26,7 @@ The Waypoint Selection Tool provides an intuitive interface for loading map imag
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/nvidia-isaac/isaac_mission_control.git
+   git clone ssh://git@gitlab-master.nvidia.com:12051/isaac_amr_platform/mission-control.git
    cd mission-control
    ```
 

@@ -6,11 +6,16 @@ test --test_env=AWS_ACCESS_KEY_ID
 test --test_env=AWS_SECRET_ACCESS_KEY
 test --test_env=AWS_REGION
 test --test_env=AWS_ENDPOINT_URL
+test --test_tmpdir=/tmp
 
 build --cxxopt='-std=c++17' 
 build --remote_timeout=3600
-build --action_env=DOCKER_CLIENT_TIMEOUT=3600
-build --action_env=COMPOSE_HTTP_TIMEOUT=3600
+common --action_env=DOCKER_CLIENT_TIMEOUT=3600
+common --action_env=COMPOSE_HTTP_TIMEOUT=3600
+common --action_env=DOCKER_HOST
+common --action_env=DOCKER_TLS_CERTDIR
+# Set platform to linux/amd64 for Docker image builds
+# build --platforms=//platforms:linux_amd64
 
 # Use our custom-configured c++ toolchain.
 build:clang_config --crosstool_top=//toolchain:clang_suite

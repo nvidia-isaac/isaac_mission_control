@@ -36,9 +36,12 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import app.api.endpoints.mission_control_api as api
 from app.core.mission_control import MissionControl
-from app.core.objectives import ObjectiveExecutor
-from app.core.mission_control_config import MissionControlConfig
+from app.core.objectives.objectives import ObjectiveExecutor
+from app.core.mission_control_config import MissionControlConfig, MapConfig
 from app.common.metrics import Timeframe
+
+from pathlib import Path
+from app.api.endpoints.mission_control_api import MAP_STORAGE_DIR
 
 
 class VerbosityOptions(enum.Enum):
@@ -64,8 +67,6 @@ parser.add_argument("--root_path", type=str, default="",
                     "set this to the url it is routed to")
 parser.add_argument("--enable_mega_observability", action="store_true", default=False,
                     help="Enable observability features for MEGA deployment.")
-parser.add_argument("--experimental_features", action="store_true", default=False,
-                    help="Enable experimental features.")
 
 args = parser.parse_known_args()[0]
 
@@ -90,14 +91,58 @@ async def lifespan(app: FastAPI):
         args.config), app.state.client, app.state.otel_meters)
     # Start MC startup but do not let it block the FastAPI server
     asyncio.create_task(mc_exp.startup())
-    if args.experimental_features:
-        ObjectiveExecutor()
+
+    # Initialize Objective Executor
+    ObjectiveExecutor()
+
+    # Register the map specified in the configuration so it appears in
+    # /map/list even if it wasn't uploaded via the HTTP API.
+    try:
+        cfg = mc_exp.config.get_map_config()
+        if cfg.metadata and (cfg.map_file or cfg.map_uri or cfg.map_s3):
+            map_id = cfg.metadata.map_id or "default_map"
+            api.app.state.available_maps[map_id] = cfg  # type: ignore[attr-defined]
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.warning("Could not register start-up map in available_maps: %s", exc)
+
+    # Persisted uploads: scan MAP_STORAGE_DIR and register everything so
+    # available_maps survives restarts on the same machine.
+    try:
+        img_patterns = ["*.png", "*.jpg", "*.jpeg"]
+        for pattern in img_patterns:
+            for img_path in Path(MAP_STORAGE_DIR).glob(pattern):
+                map_id = img_path.stem
+                if map_id in api.app.state.available_maps:  # already registered
+                    continue
+
+                metadata_yaml = img_path.with_suffix(".yaml")
+
+                try:
+                    if metadata_yaml.exists():
+                        cfg = MapConfig(
+                            map_file=str(img_path),
+                            map_uri=None,
+                            map_s3=None,
+                            metadata_yaml=str(metadata_yaml),
+                            metadata=None,
+                            map_file_loaded=None
+                        )
+                    else:
+                        raise ValueError("Missing metadata YAML for persisted map")
+
+                    api.app.state.available_maps[map_id] = cfg  # type: ignore[attr-defined]
+                except Exception as exc:  # pylint: disable=broad-except
+                    logger.warning("Skipping persisted map %s: %s", img_path, exc)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.warning("Error loading persisted maps: %s", exc)
+
     yield
     logger.info("FastAPI shutdown")
     # Stop SAP background task before closing client
     if MissionControl.sap_background_task:
         await MissionControl.sap_background_task.stop()
     await app.state.client.aclose()
+    await ObjectiveExecutor.get_instance().close()
 
 # Use a root app to define the URL prefix for the main app.
 # This will allow the main API implementation to be located at
@@ -177,7 +222,7 @@ def read_root():
     return {"Mission Control": "Copyright NVIDIA Corporation 2022-2025. All rights reserved"}
 
 
-root_app.mount("/api/v1", api.get_mission_control_app(experimental=args.experimental_features))
+root_app.mount("/api/v1", api.get_mission_control_app())
 
 
 if __name__ == "__main__":

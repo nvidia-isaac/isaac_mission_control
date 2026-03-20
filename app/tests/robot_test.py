@@ -16,6 +16,7 @@ from app.api.clients.mission_database_client import MissionDatabaseClient
 from app.tests import test_context
 from app.tests.test_context import TestConfigKey
 from cloud_common import objects
+from cloud_common.objects.robot import VDA5050AgvClass
 
 MISSION_TELEOP: dict = {
     "mission_id": "teleop",
@@ -43,12 +44,22 @@ class TestRobot(unittest.IsolatedAsyncioTestCase):
 
     async def test_battery_query(self):
         """ Validate battery """
-        additional_robots = [test_context.RobotInit("robot_b", 35, 35, battery=100),
-                             test_context.RobotInit("robot_c", 25, 25, battery=10.0)]
+        additional_robots = [test_context.RobotInit(
+            "robot_b", 35, 35, battery=100, robot_type=VDA5050AgvClass.CARRIER),
+            test_context.RobotInit(
+            "robot_c", 25, 25, battery=10.0, robot_type=VDA5050AgvClass.CARRIER)]
         with test_context.TestContext(
-                config_overrides=test_context.get_test_config(TestConfigKey.ROBOTS),
+                config_overrides=test_context.get_test_config(
+                    TestConfigKey.ROBOTS),
                 robots=additional_robots,
                 async_client=self.client) as ctx:
+            mission_control_client = MissionControlClient(
+                ctx.mission_control_config, self.client)
+
+            # Verify Control is ready
+            mc_online = await mission_control_client.wait_for_mc_alive()
+            assert mc_online
+
             # Wait for robot a to be ready
             robota_online = await ctx.mission_database_client.wait_for_robots(robots=["robot_a"])
             assert robota_online
@@ -68,11 +79,20 @@ class TestRobot(unittest.IsolatedAsyncioTestCase):
             assert len(available_robots) == 2, str(available_robots)
 
     async def test_battery_spec(self):
-        robots = [test_context.RobotInit("robot_b", 35, 35, battery=100)]
+        robots = [test_context.RobotInit(
+            "robot_b", 35, 35, battery=100, robot_type=VDA5050AgvClass.CARRIER)]
         with test_context.TestContext(
-                config_overrides=test_context.get_test_config(TestConfigKey.ROBOTS),
+                config_overrides=test_context.get_test_config(
+                    TestConfigKey.ROBOTS),
                 robots=robots,
                 async_client=self.client) as ctx:
+            mission_control_client = MissionControlClient(
+            ctx.mission_control_config, self.client)
+
+            # Verify Control is ready
+            mc_online = await mission_control_client.wait_for_mc_alive()
+            assert mc_online
+
             robots_config = ctx.config.get_robots_config()
             # Wait for robot a to be ready
             robota_online = await ctx.mission_database_client.wait_for_robots(robots=["robot_a"])

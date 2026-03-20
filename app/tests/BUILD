@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -8,7 +8,6 @@
 
 load("//bzl:python.bzl", "mission_control_py_library")
 load("//bzl:python.bzl", "mission_control_py_test")
-load("@io_bazel_rules_docker//python3:image.bzl", "py3_image")
 load("@python_third_party//:requirements.bzl", "requirement")
 
 mission_control_py_library(
@@ -51,6 +50,7 @@ mission_control_py_test(
         ":test_context",
     ],
     tags=[
+        "local",
         "exclusive",
         "supports-graceful-termination"
     ],
@@ -66,6 +66,7 @@ mission_control_py_test(
         ":test_context",
     ],
     tags=[
+        "local",
         "exclusive",
         "supports-graceful-termination"
     ],
@@ -81,6 +82,7 @@ mission_control_py_test(
         ":test_context",
     ],
     tags=[
+        "local",
         "exclusive",
         "supports-graceful-termination"
     ],
@@ -96,6 +98,7 @@ mission_control_py_test(
         ":test_context",
     ],
     tags=[
+        "local",
         "exclusive",
         "supports-graceful-termination"
     ],
@@ -111,6 +114,7 @@ mission_control_py_test(
         ":test_context",
     ],
     tags=[
+        "local",
         "exclusive",
         "supports-graceful-termination"
     ],
@@ -126,6 +130,7 @@ mission_control_py_test(
         ":test_context",
     ],
     tags=[
+        "local",
         "exclusive",
         "supports-graceful-termination"
     ],
@@ -141,6 +146,138 @@ mission_control_py_test(
         ":test_context",
     ],
     tags=[
+        "local",
+        "exclusive",
+        "supports-graceful-termination"
+    ],
+)
+
+mission_control_py_test(
+    name="objectives_test",
+    size="large",
+    srcs=[
+        "objectives_test.py",
+    ],
+    deps=[
+        ":test_context",
+    ],
+    tags=[
+        "local",
+        "exclusive",
+        "supports-graceful-termination"
+    ],
+)
+
+mission_control_py_test(
+    name="objectives_context_test",
+    size="large",
+    srcs=[
+        "objectives_context_test.py",
+    ],
+    deps=[
+        ":test_context",
+    ],
+    tags=[
+        "local",
+        "exclusive",
+        "supports-graceful-termination",
+    ],
+)
+
+mission_control_py_test(
+    name="cuopt_test",
+    size="large",
+    srcs=[
+        "cuopt_test.py",
+    ],
+    deps=[
+        ":test_context",
+    ],
+    tags=[
+        "local",
+        "exclusive",
+        "supports-graceful-termination"
+    ],
+)
+
+mission_control_py_test(
+    name="apriltag_test",
+    size="large",
+    srcs=[
+        "apriltag_test.py",
+    ],
+    deps=[
+        ":test_context",
+    ],
+    tags=[
+        "local",
+        "exclusive",
+        "supports-graceful-termination"
+    ],
+)
+
+mission_control_py_test(
+    name="map_update_test",
+    size="large",
+    srcs=[
+        "map_update_test.py",
+    ],
+    deps=[
+        ":test_context",
+    ],
+    tags=[
+        "local",
+        "exclusive",
+        "supports-graceful-termination"
+    ],
+)
+
+mission_control_py_test(
+    name="exact_end_location_test",
+    size="large",
+    srcs=[
+        "exact_end_location_test.py",
+    ],
+    deps=[
+        ":test_context",
+    ],
+    tags=[
+        "local",
+        "exclusive",
+        "supports-graceful-termination"
+    ],
+)
+
+mission_control_py_test(
+    name="objectives_decorators_test",
+    size="large",
+    srcs=[
+        "objectives_decorators_test.py",
+    ],
+    deps=[
+        ":test_context",
+    ],
+    tags=[
+        "local",
+        "exclusive",
+        "supports-graceful-termination"
+    ],    
+)
+
+mission_control_py_test(
+    name="mission_control_mcp_test",
+    size="large",
+    srcs=[
+        "mission_control_mcp_test.py",
+    ],
+    deps=[
+        ":test_context",
+        "//app:mission_control_mcp",
+        requirement("httpx"),
+        requirement("mcp"),
+    ],
+    tags=[
+        "local",
         "exclusive",
         "supports-graceful-termination"
     ],

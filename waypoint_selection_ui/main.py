@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic.v1 import BaseModel, Field
 import shutil
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,10 +17,9 @@ import json
 
 
 class Point(BaseModel):
-    """ 3D Point """
+    """ 2D Point """
     x: float = Field(title="X coordinate of a point")
-    y: float = Field(title="Y coordinate of a point") 
-    z: float = Field(title="Optional Z coordinate of a point", default=0.0)
+    y: float = Field(title="Y coordinate of a point")
 
 # Additional models for route visualization
 class MissionData(BaseModel):

@@ -40,6 +40,7 @@ class WaypointGraphGeneratorClient(BaseAPIClient):
             "path": "/v1/graph/visualize",
         }
     }
+    _timeout = 300
 
     async def request_new_graph(self):
         """ Request for a new graph from the API with retry logic for timeouts"""
@@ -59,39 +60,18 @@ class WaypointGraphGeneratorClient(BaseAPIClient):
         if map_config.map_uri:
             data['map_uri'] = map_config.map_uri
         
-        # Apply retry logic
-        max_retries = 3
-        
-        for attempt in range(max_retries):
-            try:
-                self._logger.info(f"Attempting graph generation (attempt {attempt+1}/{max_retries})")
-                
-                # If this isn't the first attempt, add a delay before retrying
-                if attempt > 0:
-                    backoff_time = 5 * attempt  # Simple linear backoff
-                    self._logger.info(f"Waiting {backoff_time} seconds before retry...")
-                    await asyncio.sleep(backoff_time)
+        # Use built-in retry logic from BaseAPIClient
+        graph_data = await self.make_request_with_logs(
+            "post", endpoint,
+            "WPG service error",
+            "Received Graph from WPG",
+            data=data,
+            files=files,
+            suppress_msg=True,
+            retry_safe=True,
+        )
 
-                graph_data = await self.make_request_with_logs(
-                    "post", endpoint, 
-                    "WPG service error",
-                    "Received Graph from WPG", 
-                    data=data,
-                    files=files,
-                    suppress_msg=True
-                )
-                
-                graph = WaypointGraph(**graph_data, map_id=metadata.map_id)
-                return graph
-                
-            except HTTPError as exc:
-                self._logger.warning(f"Graph generation failed (attempt {attempt+1}/{max_retries}): {exc}")
-                
-                # Only raise on final attempt
-                if attempt == max_retries - 1:
-                    self._logger.error(f"Graph generation failed after {max_retries} attempts")
-                    raise
-        return None
+        return WaypointGraph(**graph_data, map_id=metadata.map_id)
 
     async def get_nearest_nodes(self, coordinates):
         """

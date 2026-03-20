@@ -27,7 +27,7 @@ services:
 
 map:
   # One and only one of map_file, map_uri, or map_s3 must be set
-  map_file: "./app/config/maps/carter_warehouse_navigation.png"
+  map_file: "/tmp/config/maps/carter_warehouse_navigation.png"
   # map_uri: ""
   # map_s3:
 
@@ -59,6 +59,14 @@ telemetry:
   TELEMETRY_ID: ""
   TELEMETRY_SECRET: ""
   TELEMETRY_ENV: "DEV" # {DEV | TEST | PROD}
+
+kafka:
+  push_to_kafka: False
+  kafka_server: "localhost:9092"
+  kafka_producer_topic: "mdx-amr"
+  kafka_place: "city=Santa Clara/building=NVIDIA Voyager/room=Visitor Lobby"
+  kafka_consumer_topic: "test-topic"
+  kafka_consumer_frequency_seconds: 0.5
 
 s3:
   AWS_ACCESS_KEY_ID: ""

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mission-control-mcp"
+version = "1.0.0"
+description = "MCP server for Mission Control robot fleet management and mission operations"
+authors = [
+    {name = "Mission Control Team"},
+]
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+dependencies = [
+    "mcp==1.26.0",
+    "requests==2.32.5",
+]
+
+[project.optional-dependencies]
+dev = [
+]
+
+[project.scripts]
+mission-control-mcp = "mission_control_mcp.server:main"
+
+[tool.setuptools]
+packages = ["mission_control_mcp"]
+
+[tool.setuptools.package-dir]
+mission_control_mcp = "src"
+

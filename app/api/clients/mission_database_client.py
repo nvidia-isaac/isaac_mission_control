@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2023-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -14,9 +14,10 @@ from httpx import HTTPError
 
 from app.api.clients.base_api_client import BaseAPIClient
 from cloud_common.objects.detection_results import DetectionResultsObjectV1
+from cloud_common.objects.apriltag_results import AprilTagResultsObjectV1
 from cloud_common.objects.robot import RobotObjectV1, RobotStateV1
 from cloud_common.objects.mission import MissionObjectV1
-from cloud_common.objects.objective import ObjectiveV1, ObjectiveStateV1
+from cloud_common.objects.objective import ObjectiveV1, ObjectiveStateV1, ObjectiveStatusV1
 
 
 class MissionDatabaseClient(BaseAPIClient):
@@ -31,6 +32,9 @@ class MissionDatabaseClient(BaseAPIClient):
         },
         "detection_results": {
             "path": "/detection_results"
+        },
+        "apriltag_results": {
+            "path": "/apriltag_results"
         },
         "objective": {
             "path": "/objective"
@@ -72,13 +76,30 @@ class MissionDatabaseClient(BaseAPIClient):
         self._logger.info("Retrieved detection results from database")
         return DetectionResultsObjectV1(**detector_object)
 
+    async def get_apriltag_results(self, name: str) -> AprilTagResultsObjectV1:
+        """ Get AprilTag results by robot name from mission database """
+        self._logger.info(
+            "Querying AprilTag results from Mission Database API")
+
+        endpoint_info = self._endpoints["apriltag_results"]
+        endpoint = self._base_url + endpoint_info["path"] + "/" + name
+
+        apriltag_object = await self.make_request_with_logs("get",
+                                                            endpoint,
+                                                            success_msg="AprilTag get success",
+                                                            error_msg="AprilTag get failure")
+        self._logger.info("Retrieved AprilTag results from database")
+        return AprilTagResultsObjectV1(**apriltag_object)
+
     async def get_robots(self, params: Optional[dict] = None) -> list[RobotObjectV1]:
         """ Get all robot objects in the mission database """
-        self._logger.info("Querying robot information from Mission Database API")
+        #  Changed to debug instead of info to avoid spamming the logs
+        self._logger.debug("Querying robot information from Mission Database API")
 
         endpoint_info = self._endpoints["robot"]
         endpoint = self._base_url + endpoint_info["path"]
 
+        robots = []
         try:
             self._logger.debug("Filter: %s", params)
             robots = await self.make_request_with_logs("get",
@@ -93,7 +114,7 @@ class MissionDatabaseClient(BaseAPIClient):
         self._logger.debug("Robots: %s", str(robot_objs))
         return robot_objs
 
-    async def get_mission(self, name: str) -> MissionObjectV1:
+    async def get_mission(self, name: str) -> MissionObjectV1 | None:
         """ Get one mission by name from mission database """
         self._logger.info("Querying mission information from Mission Database API")
 
@@ -105,20 +126,21 @@ class MissionDatabaseClient(BaseAPIClient):
                                                         endpoint,
                                                         success_msg="Successfully queried mission",
                                                         error_msg="Failed to query mission")
-
         except HTTPError as exc:
-            self._logger.warning(exc)
+            self._logger.error(exc)
+            return None
         mission_obj = MissionObjectV1(**mission)
         self._logger.debug("Mission: %s", mission_obj)
         return mission_obj
 
-    async def get_missions(self, params: Optional[dict] = None) -> list[MissionObjectV1]:
+    async def get_missions(self, params: Optional[dict] = None) -> list[MissionObjectV1] | None:
         """ Get missions from mission database """
         self._logger.info("Querying mission information from Mission Database API")
 
         endpoint_info = self._endpoints["mission"]
         endpoint = self._base_url + endpoint_info["path"]
 
+        missions = []
         try:
             missions = await self.make_request_with_logs("get",
                                                          endpoint,
@@ -127,7 +149,8 @@ class MissionDatabaseClient(BaseAPIClient):
                                                          params=params)
 
         except HTTPError as exc:
-            self._logger.warning(exc)
+            self._logger.error(exc)
+            return None
         mission_objs = [MissionObjectV1(**mission) for mission in missions]
         self._logger.debug("Missions: %s", str(mission_objs))
         return mission_objs
@@ -226,10 +249,18 @@ class MissionDatabaseClient(BaseAPIClient):
         end_time = time.time() + timeout
         while time.time() < end_time:
             robot_objs = await self.get_robots(params={"names": robots})
+                
+            # Check if all robots are online and idle   
+            all_ready = True
             for robot in robot_objs:
-                if robot.status.online and robot.status.state == RobotStateV1.IDLE:
-                    return True
-                await asyncio.sleep(1)
+                if not (robot.status.online and robot.status.state == RobotStateV1.IDLE):
+                    all_ready = False
+                    break
+                        
+            if all_ready:
+                return True
+                
+            await asyncio.sleep(1)
         return False
 
     async def health(self, suppress_error_msg=False):

@@ -30,8 +30,6 @@ class Task:
         Setter for the WayPointGraph node IDs that
         are closest to the tasks
         """
-        logging.debug("Task location node IDs")
-        logging.debug(nodes)
         if -1 in nodes:
             raise Exception("Task node location ID can not be negative")
 
@@ -44,7 +42,7 @@ class Task:
 
         # If for example we have a 100 node route, windows are [0,100],[100,200]...
         multiplier = int(len(nodes)*max_weight) + 100
-        if len(nodes) > 2:
+        if len(nodes) >= 2:
             for i in range(len(nodes)):
                 self.task_time_windows.append([int(i*multiplier),
                                                int((i+1)*multiplier)])

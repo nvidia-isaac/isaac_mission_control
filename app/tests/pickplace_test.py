@@ -13,6 +13,7 @@ from app.api.clients.mission_control_client import MissionControlClient
 from app.api.clients.mission_database_client import MissionDatabaseClient
 from app.tests import test_context
 from app.tests.test_context import TestConfigKey
+from cloud_common.objects.robot import VDA5050AgvClass
 
 from httpx import HTTPStatusError
 
@@ -30,7 +31,7 @@ class TestPickPlace(unittest.IsolatedAsyncioTestCase):
     async def test_pickplace_on_manipulator(self):
         """Ensure that pickplace works for manipulator robots"""
         robots = [test_context.RobotInit(
-            "robot_a", 35, 35, battery=100, robot_type="arm")]
+            "robot_a", 35, 35, battery=100, robot_type=VDA5050AgvClass.MANIPULATOR)]
         with test_context.TestContext(
                 config_overrides=test_context.get_test_config(TestConfigKey.PICKPLACE),
                 robots=robots,
@@ -53,7 +54,7 @@ class TestPickPlace(unittest.IsolatedAsyncioTestCase):
 
     async def test_pickplace_on_amr(self):
         robots = [test_context.RobotInit(
-            "robot_a", 35, 35, battery=100, robot_type="amr")]
+            "robot_b", 35, 35, battery=100, robot_type=VDA5050AgvClass.CARRIER)]
         with test_context.TestContext(
                 config_overrides=test_context.get_test_config(TestConfigKey.PICKPLACE),
                 robots=robots,
@@ -68,12 +69,12 @@ class TestPickPlace(unittest.IsolatedAsyncioTestCase):
             mc_online = await mission_control_client.wait_for_mc_alive()
             assert mc_online
             # Wait for robots to be ready
-            robots_online = await mission_database_client.wait_for_robots(robots=["robot_a"])
+            robots_online = await mission_database_client.wait_for_robots(robots=["robot_b"])
             assert robots_online
 
             with self.assertRaises(HTTPStatusError):
                 await mission_control_client.send_pickplace_mission(
-                    "robot_a", 0, "macaroni_box", 0, 0, 0, 0, 0, 0, 0)
+                    "robot_b", 0, "macaroni_box", 0, 0, 0, 0, 0, 0, 0)
 
 
 if __name__ == "__main__":

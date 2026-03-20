@@ -8,6 +8,7 @@
 
 import asyncio
 import time
+from typing import Optional, List
 
 from httpx import HTTPError
 
@@ -53,14 +54,42 @@ class MissionControlClient(BaseAPIClient):
                 "robot_name"
             }
         },
+        "apriltag_detection": {
+            "path": "/api/v1/mission/get_available_apriltags",
+            "fields": {
+                "robot_name"
+            }
+        },
         "submit_objective": {
-            "path": "/api/v1/submit_objective",
+            "path": "/api/v1/objective/submit_objective",
         },
         "cancel_objective": {
-            "path": "/api/v1/cancel_objective",
+            "path": "/api/v1/objective/cancel_objective",
         },
         "visualize_route": {
             "path": "/api/v1/visualize_route",
+        },
+        # Map management endpoints
+        "map_upload": {
+            "path": "/api/v1/map/upload",
+        },
+        "map_list": {
+            "path": "/api/v1/map/list",
+        },
+        "map_preview": {
+            "path": "/api/v1/map/preview",
+        },
+        "map_select": {
+            "path": "/api/v1/map/select",
+        },
+        "map_update_robot": {
+            "path": "/api/v1/map/update_robot",
+        },
+        "map_current": {
+            "path": "/api/v1/map",
+        },
+        "map_metadata": {
+            "path": "/api/v1/map/metadata",
         },
     }
 
@@ -145,6 +174,18 @@ class MissionControlClient(BaseAPIClient):
                                                    params=params)
         return result
 
+    async def send_apriltag_detection_mission(self, robot_name: str):
+        """ Give AprilTag detection mission to single robot """
+        self._logger.info("Sending AprilTag detection mission from mission control")
+        endpoint_info = self._endpoints["apriltag_detection"]
+        endpoint = self._base_url + endpoint_info["path"]
+        self._logger.debug("Robot doing AprilTag detection: %s", robot_name)
+        params = {"robot_name": robot_name}
+        result = await self.make_request_with_logs("get", endpoint, "Mission control error",
+                                                   "Mission control accepted AprilTag detection mission",
+                                                   params=params)
+        return result
+
     async def update_map(self, map_uri: str, force_replan: bool = False):
         """ Updates map and replan ongoing missions """
         self._logger.info("Updating map")
@@ -199,3 +240,110 @@ class MissionControlClient(BaseAPIClient):
         except Exception as e:
             self._logger.error(f"Route visualization error: {str(e)}")
             raise
+
+    # ---------------------------
+    # Map management client calls
+    # ---------------------------
+    async def upload_map(
+        self,
+        map_id: str,
+        image_bytes: bytes,
+        image_filename: str,
+        metadata_yaml_bytes: Optional[bytes] = None,
+        metadata_filename: Optional[str] = None,
+    ):
+        """Upload a map image (and optional YAML) to Mission Control."""
+        self._logger.info("Uploading map '%s' to Mission Control", map_id)
+        endpoint = self._base_url + self._endpoints["map_upload"]["path"]
+
+        files = {
+            "map_image": (image_filename, image_bytes, "image/png"),
+        }
+        if metadata_yaml_bytes is not None:
+            files["metadata_yaml"] = (
+                metadata_filename or "metadata.yaml",
+                metadata_yaml_bytes,
+                "application/x-yaml",
+            )
+
+        # Uploads are not retry-safe — avoid duplicate uploads
+        return await self.make_request_with_logs(
+            "post",
+            endpoint,
+            "Mission control map upload error",
+            "Mission control map upload success",
+            retry_safe=False,
+            data={"map_id": map_id},
+            files=files,
+        )
+
+    async def list_maps(self) -> List[str]:
+        """List IDs of maps previously uploaded to Mission Control."""
+        self._logger.info("Listing uploaded maps")
+        endpoint = self._base_url + self._endpoints["map_list"]["path"]
+        return await self.make_request_with_logs(
+            "get",
+            endpoint,
+            "Mission control map list error",
+            "Mission control map list success",
+        )
+
+    async def preview_map(self, map_id: str) -> bytes:
+        """Download bytes of an uploaded map image by ID."""
+        self._logger.info("Previewing uploaded map '%s'", map_id)
+        base = self._base_url + self._endpoints["map_preview"]["path"]
+        endpoint = f"{base}/{map_id}"
+        try:
+            resp = await self._client.get(endpoint, headers={"Accept": "image/*,application/octet-stream"})
+            resp.raise_for_status()
+            return resp.content
+        except Exception as e:
+            self._logger.error("Map preview error for %s: %s", map_id, str(e))
+            raise
+
+    async def select_map(self, map_id: str):
+        """Activate an uploaded map by ID in Mission Control."""
+        self._logger.info("Selecting uploaded map '%s'", map_id)
+        base = self._base_url + self._endpoints["map_select"]["path"]
+        endpoint = f"{base}/{map_id}"
+        return await self.make_request_with_logs(
+            "post",
+            endpoint,
+            "Mission control map select error",
+            "Mission control map select success",
+        )
+
+    async def update_robot_map(self, robot_name: str, map_id: str):
+        """Trigger download and enable of map on a specific robot."""
+        self._logger.info("Updating robot '%s' to map '%s'", robot_name, map_id)
+        base = self._base_url + self._endpoints["map_update_robot"]["path"]
+        endpoint = f"{base}/{robot_name}/{map_id}"
+        return await self.make_request_with_logs(
+            "post",
+            endpoint,
+            "Mission control update_robot_map error",
+            "Mission control update_robot_map success",
+        )
+
+    async def get_current_map(self) -> bytes:
+        """Fetch the currently configured map file as bytes."""
+        self._logger.info("Fetching current map file")
+        endpoint = self._base_url + self._endpoints["map_current"]["path"]
+        try:
+            resp = await self._client.get(endpoint, headers={"Accept": "image/*,application/octet-stream"})
+            resp.raise_for_status()
+            return resp.content
+        except Exception as e:
+            self._logger.error("Get current map error: %s", str(e))
+            raise
+
+    async def get_map_metadata(self) -> dict:
+        """Fetch metadata for the currently configured map."""
+        self._logger.info("Fetching current map metadata")
+        endpoint = self._base_url + self._endpoints["map_metadata"]["path"]
+        return await self.make_request_with_logs(
+            "get",
+            endpoint,
+            "Mission control map metadata error",
+            "Mission control map metadata success",
+        )

@@ -40,23 +40,19 @@ docker compose -f waypoint_selection_ui/bringup_wp_selection_ui.yaml up --build
 [
   {
     "x": -2.9223684210526315,
-    "y": 4.0245616712068255,
-    "z": 0
+    "y": 4.0245616712068255
   },
   {
     "x": 7.07763157894737,
-    "y": 3.8666669343647193,
-    "z": 0
+    "y": 3.8666669343647193
   },
   {
     "x": 7.1828947368421066,
-    "y": -5.922806749845808,
-    "z": 0
+    "y": -5.922806749845808
   },
   {
     "x": -3.2907894736842085,
-    "y": -5.922806749845808,
-    "z": 0
+    "y": -5.922806749845808
   }
 ]
 ```
@@ -69,35 +65,69 @@ docker compose -f waypoint_selection_ui/bringup_wp_selection_ui.yaml up --build
 - You can access the Mission Control web interface at: http://localhost:8050/api/v1/docs
 - Open the menu for `POST /mission/submit_mission` and click on 'Try it out'.
 - In the request body, create a JSON object with the key 'route' and the value being the list of waypoints you generated in the previous step. An example is shown below. 
-- (Optional) Add the key 'iterations' and the value being the number of times the mission should be executed. The default is 1. In the example below, the mission will be executed twice.
-```
+- Press execute to submit the mission.
+
+<details>
+<summary>Optional Mission parameters</summary>
+
+- Add the key 'iterations' and the value being the number of times the mission should be executed. The default is 1. In the example below, the route will be executed twice.
+
+```json
 {
     "route": [
         {
             "x": -2.9223684210526315,
-            "y": 4.0245616712068255,
-            "z": 0
+            "y": 4.0245616712068255
         },
         {
             "x": 7.07763157894737,
-            "y": 3.8666669343647193,
-            "z": 0
+            "y": 3.8666669343647193
         },
         {
             "x": 7.1828947368421066,
-            "y": -5.922806749845808,
-            "z": 0
+            "y": -5.922806749845808
         },
         {
             "x": -3.2907894736842085,
-            "y": -5.922806749845808,
-            "z": 0
+            "y": -5.922806749845808
         }
     ],
     "iterations": 2
 }
 ```
-- Press execute to submit the mission.
-6. After the response is received, verify that you see the Nova Carter navigate to the waypoints and complete the mission.
+
+- By default Mission Control will route to the nearest waypoints provided by SWAGGER. If you want the robot to end on a specific `x`, `y`, `theta` position, you can use the `end_location` parameter with `exact` set to true. Set `theta` to the desired orientation of the robot in radians.
+
+```json
+{
+    "route": [
+        {
+            "x": -2.9223684210526315,
+            "y": 4.0245616712068255
+        },
+        {
+            "x": 7.07763157894737,
+            "y": 3.8666669343647193
+        },
+        {
+            "x": 7.1828947368421066,
+            "y": -5.922806749845808
+        },
+        {
+            "x": -3.2907894736842085,
+            "y": -5.922806749845808
+        }
+    ],
+    "end_location": {
+        "x": -2.5081181774400676,
+        "y": -8.503454413823114,
+        "theta": 1.57,
+        "exact": true
+    }
+}
+```
+</details>
+
+5. After the response is received, verify that you see the Nova Carter navigate to the waypoints and complete the mission.
 
 <img src="assets/images/tutorial_mission.gif">

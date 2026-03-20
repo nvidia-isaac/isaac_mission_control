@@ -11,6 +11,8 @@ from json.decoder import JSONDecodeError
 
 import httpx
 from httpx import HTTPError
+import asyncio
+import random
 
 
 class BaseAPIClient:
@@ -28,16 +30,55 @@ class BaseAPIClient:
         return self._base_url
 
     async def make_request_with_logs(self, method_name, endpoint, error_msg, success_msg,
-                                     suppress_msg=False, **kwargs):
-        try:
-            response = await self._client.request(method=method_name, url=endpoint,
-                                                  timeout=self._timeout, **kwargs)
-            response.raise_for_status()
-        except (HTTPError) as exc:
-            if not suppress_msg:
-                self._logger.error("endpoint %s HTTPError failure", endpoint)
-                self._logger.error("%s, %s", error_msg, exc)
-            raise
+                                     suppress_msg=False, retry_safe=True, max_attempts=5, **kwargs):
+        """Make an HTTP request with logging and built-in retry logic.
+
+        Args:
+            method_name (str): HTTP verb ("get", "post" …).
+            endpoint (str): Complete URL to call.
+            error_msg (str): Message to log on failures.
+            success_msg (str): Message to log on success.
+            suppress_msg (bool): If True, minimise log noise.
+            retry_safe (bool): Only retry when the operation is idempotent / safe.
+            max_attempts (int): Total attempts (first try + retries).
+
+        The policy retries network errors and 429/502/503/504 responses
+        with exponential back-off capped at 30 s and ±20 % jitter.
+        """
+        retryable_status_codes = {429, 502, 503, 504}
+        initial_delay = 0.5  # seconds
+        max_delay = 30.0     # seconds
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = await self._client.request(method=method_name, url=endpoint,
+                                                      timeout=self._timeout, **kwargs)
+                response.raise_for_status()
+                # Success — leave retry loop
+                break
+            except HTTPError as exc:
+                # Some httpx exceptions (e.g. ConnectError) do not carry a `response` attribute.
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                is_retryable = retry_safe and (status is None or status in retryable_status_codes)
+
+                # Decide whether we should retry
+                should_retry = is_retryable and attempt < max_attempts
+
+                if not should_retry:
+                    if not suppress_msg:
+                        self._logger.error("endpoint %s HTTPError failure", endpoint)
+                        self._logger.error("%s, %s", error_msg, exc)
+                    raise
+
+                # Back-off before the next attempt
+                delay = min(max_delay, initial_delay * (2 ** (attempt - 1)))
+                delay *= random.uniform(0.8, 1.2)  # jitter ±20 %
+                if not suppress_msg:
+                    self._logger.warning(
+                        "Attempt %d/%d failed (%s). Retrying in %.2fs…",
+                        attempt, max_attempts, exc, delay,
+                    )
+                await asyncio.sleep(delay)
 
         self._logger.debug(success_msg)
         try:

@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -7,7 +7,23 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 load("//bzl:python.bzl", "mission_control_py_binary")
+load("//bzl:python.bzl", "mission_control_py_library")
 load("@python_third_party//:requirements.bzl", "requirement")
+
+mission_control_py_library(
+    name = "mission_control_mcp",
+    srcs = [
+        "agentic-utilities/mission-control-mcp/src/__init__.py",
+        "agentic-utilities/mission-control-mcp/src/queries.py",
+        "agentic-utilities/mission-control-mcp/src/server.py",
+    ],
+    imports = ["agentic-utilities/mission-control-mcp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        requirement("mcp"),
+        requirement("requests"),
+    ],
+)
 
 mission_control_py_binary(
     name = "mission-control",
@@ -18,6 +34,7 @@ mission_control_py_binary(
         "//app/api",
         "//app/common",
         "//app/core",
+        "//app/core/objectives",
         requirement("fastapi"),
         requirement("uvicorn"),
         requirement("pydantic"),
@@ -29,6 +46,7 @@ mission_control_py_binary(
         requirement("numpy"),
         requirement("scipy"),
         requirement("requests"),
+        requirement("python-multipart"),
     ],
     data = [
         "//app/config:map_dir",

@@ -6,7 +6,7 @@ exports_files([
 
 filegroup(
     name="etc_dir",
-    data=glob(["etc/*"]),
+    data=glob(["etc/*"], allow_empty=True),
     tags=["nolint"],
     visibility=["//visibility:public"],
 )
