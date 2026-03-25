@@ -2,7 +2,7 @@
 
 This tutorial simulates a virtual Nova Carter running Mission Client in Isaac Sim and assign it a mission with Mission Control.
 
-1. To start, follow the instructions in the [Isaac ROS Mission Client tutorial](https://nvidia-isaac-ros.github.io/concepts/missions/isaac_ros_mission_client.html#tutorial-walkthrough) up to step 5. Verify that you have the warehouse scene open in Isaac Sim along with Mission Client built and that the scene in Isaac Sim looks like the image below.
+1. To start, follow the instructions in the [Isaac ROS Mission Client tutorial](https://nvidia-isaac-ros.github.io/concepts/cloud_control/isaac_ros_mission_client.html#tutorial-walkthrough) up to step 5. Verify that you have the warehouse scene open in Isaac Sim along with Mission Client built and that the scene in Isaac Sim looks like the image below.
 
 <img src="assets/images/tutorial_warehouse_scene.png" width="1079" height="600">
 
@@ -13,7 +13,7 @@ cd docs/tutorial/docker-compose
 docker compose -f bringup_services_tutorial.yaml up
 ```
 
-3. Follow Step 7 of the [Isaac ROS Mission Client tutorial](https://nvidia-isaac-ros.github.io/concepts/missions/isaac_ros_mission_client.html#tutorial-walkthrough) to start the Mission Client. For reference, the command below is run inside the Isaac Docker container:
+3. Follow Step 7 of the [Isaac ROS Mission Client tutorial](https://nvidia-isaac-ros.github.io/concepts/cloud_control/isaac_ros_mission_client.html#tutorial-walkthrough) to start the Mission Client. For reference, the command below is run inside the Isaac Docker container:
 
 ```
 ros2 launch isaac_ros_vda5050_nav2_client_bringup isaac_ros_vda5050_nav2_client.launch.py init_pose_x:=-2.0 init_pose_yaw:=3.14159
