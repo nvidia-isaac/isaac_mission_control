@@ -65,7 +65,8 @@ TOOL_SELECT_MAP = "select_map"
 TOOL_DEPLOY_MAP_TO_ROBOT = "deploy_map_to_robot"
 TOOL_SUBMIT_OBJECTIVE = "submit_objective"
 TOOL_CANCEL_OBJECTIVE = "cancel_objective"
-TOOL_SUBMIT_PICK_AND_PLACE = "submit_pick_and_place"
+TOOL_SUBMIT_MULTI_OBJECT_PICK_AND_PLACE = "submit_multi_object_pick_and_place"
+TOOL_SUBMIT_ACTION = "submit_action_mission"
 
 
 def _text_result(text: str, *, is_error: bool = False) -> CallToolResult:
@@ -330,55 +331,119 @@ async def list_tools() -> ListToolsResult:
                 },
             ),
             Tool(
-                name=TOOL_SUBMIT_PICK_AND_PLACE,
-                description="Submit a pick and place mission for a manipulator robot",
+                name=TOOL_SUBMIT_MULTI_OBJECT_PICK_AND_PLACE,
+                description=(
+                    "Submit a multi-object pick and place mission (matches ROS "
+                    "MultiObjectPickAndPlace: mode SINGLE_BIN or MULTI_BIN, class_ids, "
+                    "and target poses in frame_id)."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "robot_name": {
                             "type": "string",
-                            "description": "Name of the manipulator robot (required)",
+                            "description": "Manipulator robot name (required)",
                         },
-                        "object_id": {
-                            "type": "integer",
-                            "description": "ID of the object to pick (required)",
-                        },
-                        "class_id": {
+                        "mode": {
                             "type": "string",
-                            "description": "Class/type of the object (required)",
+                            "enum": ["SINGLE_BIN", "MULTI_BIN"],
+                            "description": (
+                                "SINGLE_BIN: one place pose for one or more picks to the same bin; "
+                                "MULTI_BIN: one pose per class_id (required)"
+                            ),
                         },
-                        "pos_x": {"type": "number", "description": "Target X position (required)"},
-                        "pos_y": {"type": "number", "description": "Target Y position (required)"},
-                        "pos_z": {"type": "number", "description": "Target Z position (required)"},
-                        "quat_x": {
-                            "type": "number",
-                            "description": "Orientation quaternion X (required)",
+                        "class_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Class IDs to pick; use [] for ROS-style 'no class filter' in "
+                                "SINGLE_BIN. MULTI_BIN requires one ID per pose (optional, default [])."
+                            ),
                         },
-                        "quat_y": {
-                            "type": "number",
-                            "description": "Orientation quaternion Y (required)",
+                        "frame_id": {
+                            "type": "string",
+                            "description": "TF frame for poses, e.g. base_link (required)",
                         },
-                        "quat_z": {
-                            "type": "number",
-                            "description": "Orientation quaternion Z (required)",
-                        },
-                        "quat_w": {
-                            "type": "number",
-                            "description": "Orientation quaternion W (required)",
+                        "poses": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "position": {
+                                        "type": "object",
+                                        "properties": {
+                                            "x": {"type": "number"},
+                                            "y": {"type": "number"},
+                                            "z": {"type": "number"},
+                                        },
+                                        "required": ["x", "y", "z"],
+                                    },
+                                    "orientation": {
+                                        "type": "object",
+                                        "properties": {
+                                            "x": {"type": "number"},
+                                            "y": {"type": "number"},
+                                            "z": {"type": "number"},
+                                            "w": {"type": "number"},
+                                        },
+                                        "required": ["x", "y", "z", "w"],
+                                    },
+                                },
+                                "required": ["position", "orientation"],
+                            },
+                            "description": "Place pose(s); SINGLE_BIN uses exactly 1 pose (required)",
                         },
                     },
-                    "required": [
-                        "robot_name",
-                        "object_id",
-                        "class_id",
-                        "pos_x",
-                        "pos_y",
-                        "pos_z",
-                        "quat_x",
-                        "quat_y",
-                        "quat_z",
-                        "quat_w",
-                    ],
+                    "required": ["robot_name", "mode", "frame_id", "poses"],
+                },
+            ),
+            Tool(
+                name=TOOL_SUBMIT_ACTION,
+                description=(
+                    "Submit an arbitrary VDA5050 action mission to a robot. "
+                    "Supports any action_type the robot understands, e.g. "
+                    "'humanoid_manipulation' with action_parameters such as "
+                    "{'task_category': 'manipulation', 'task_id': 'apple_to_plate', "
+                    "'language_instruction': 'pick up the apple and place it on the plate', "
+                    "'timeout': '15.0'}."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "robot_name": {
+                            "type": "string",
+                            "description": ROBOT_NAME_REQUIRED_DESCRIPTION,
+                        },
+                        "action_type": {
+                            "type": "string",
+                            "description": (
+                                "Type of action to perform, e.g. 'humanoid_manipulation' (required)"
+                            ),
+                        },
+                        "action_parameters": {
+                            "type": "object",
+                            "additionalProperties": {"type": "string"},
+                            "description": (
+                                "Action-specific string key-value parameters. "
+                                "For humanoid_manipulation: task_category, task_id, "
+                                "language_instruction, timeout (optional, default {})"
+                            ),
+                        },
+                        "blocking_type": {
+                            "type": "string",
+                            "enum": ["HARD", "SOFT", "NONE"],
+                            "description": (
+                                "HARD: wait for action completion; "
+                                "SOFT: continue with soft constraint; "
+                                "NONE: fire-and-forget (optional, default HARD)"
+                            ),
+                        },
+                        "timeout_s": {
+                            "type": "integer",
+                            "description": "Action timeout in seconds (optional, default 600)",
+                        },
+                    },
+                    "required": ["robot_name", "action_type"],
                 },
             ),
         ]
@@ -487,8 +552,95 @@ def _handle_cancel_objective(arguments: dict) -> CallToolResult:
     return _unsupported_feature(TOOL_CANCEL_OBJECTIVE)
 
 
-def _handle_pick_and_place(arguments: dict) -> CallToolResult:
-    return _unsupported_feature(TOOL_SUBMIT_PICK_AND_PLACE)
+def _handle_submit_action(arguments: dict) -> CallToolResult:
+    robot_name = _require(arguments, "robot_name")
+    action_type = _require(arguments, "action_type")
+    action_parameters = arguments.get("action_parameters") or {}
+    if not isinstance(action_parameters, dict):
+        raise ValueError("action_parameters must be an object with string values")
+    blocking_type = str(arguments.get("blocking_type", "HARD")).upper()
+    timeout_s = int(arguments.get("timeout_s", 600))
+
+    response = mc_client.submit_action_mission(
+        robot_name=robot_name,
+        action_type=action_type,
+        action_parameters={str(k): str(v) for k, v in action_parameters.items()},
+        blocking_type=blocking_type,
+        timeout_s=timeout_s,
+    )
+
+    result = "**Action Mission Submitted**\n\n"
+    result += f"- Robot: {robot_name}\n"
+    result += f"- Action type: {action_type}\n"
+    result += f"- Blocking: {blocking_type}\n"
+    if action_parameters:
+        result += f"- Parameters: {action_parameters}\n"
+    result += format_mission_response(response)
+    return _text_result(result)
+
+
+def _normalize_mopp_pose(pose: Any) -> Dict[str, Any]:
+    if not isinstance(pose, dict):
+        raise ValueError("Each pose must be an object with position and orientation")
+    pos = pose.get("position") or {}
+    ori = pose.get("orientation") or {}
+    return {
+        "position": {
+            "x": float(pos.get("x", 0)),
+            "y": float(pos.get("y", 0)),
+            "z": float(pos.get("z", 0)),
+        },
+        "orientation": {
+            "w": float(ori.get("w", 1)),
+            "x": float(ori.get("x", 0)),
+            "y": float(ori.get("y", 0)),
+            "z": float(ori.get("z", 0)),
+        },
+    }
+
+
+def _handle_multi_object_pick_and_place(arguments: dict) -> CallToolResult:
+    robot_name = _require(arguments, "robot_name")
+    mode = str(_require(arguments, "mode")).upper()
+    if mode not in ("SINGLE_BIN", "MULTI_BIN"):
+        raise ValueError("mode must be SINGLE_BIN or MULTI_BIN")
+
+    class_ids = arguments.get("class_ids")
+    if class_ids is None:
+        class_ids = []
+    if not isinstance(class_ids, list):
+        raise ValueError("class_ids must be an array (use [] to match ROS empty class_ids)")
+    class_ids_str = [str(c) for c in class_ids]
+
+    frame_id = str(_require(arguments, "frame_id"))
+    poses_raw = arguments.get("poses")
+    if not isinstance(poses_raw, list) or len(poses_raw) < 1:
+        raise ValueError("poses must be a non-empty array")
+    poses = [_normalize_mopp_pose(p) for p in poses_raw]
+
+    if mode == "SINGLE_BIN" and len(poses) != 1:
+        raise ValueError("SINGLE_BIN requires exactly one pose")
+    if mode == "MULTI_BIN":
+        if len(class_ids_str) < 1:
+            raise ValueError("MULTI_BIN requires non-empty class_ids")
+        if len(poses) != len(class_ids_str):
+            raise ValueError("MULTI_BIN requires len(poses) == len(class_ids)")
+
+    response = mc_client.submit_multi_object_pick_and_place(
+        robot_name=robot_name,
+        mode=mode,
+        class_ids=class_ids_str,
+        frame_id=frame_id,
+        poses=poses,
+    )
+
+    result = "**Multi-Object Pick and Place Mission Submitted**\n\n"
+    result += f"- Robot: {robot_name}\n"
+    result += f"- Mode: {mode}\n"
+    result += f"- Class IDs: {', '.join(class_ids_str) if class_ids_str else '(none)'}\n"
+    result += f"- Poses: {len(poses)}\n"
+    result += format_mission_response(response)
+    return _text_result(result)
 
 
 ToolHandler = Callable[[dict], CallToolResult]
@@ -507,7 +659,8 @@ _TOOL_HANDLERS: Dict[str, ToolHandler] = {
     TOOL_DEPLOY_MAP_TO_ROBOT: _handle_deploy_map,
     TOOL_SUBMIT_OBJECTIVE: _handle_submit_objective,
     TOOL_CANCEL_OBJECTIVE: _handle_cancel_objective,
-    TOOL_SUBMIT_PICK_AND_PLACE: _handle_pick_and_place,
+    TOOL_SUBMIT_MULTI_OBJECT_PICK_AND_PLACE: _handle_multi_object_pick_and_place,
+    TOOL_SUBMIT_ACTION: _handle_submit_action,
 }
 
 

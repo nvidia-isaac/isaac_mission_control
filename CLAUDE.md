@@ -1,0 +1,1 @@
+Always read and follow AGENTS_BASE.md

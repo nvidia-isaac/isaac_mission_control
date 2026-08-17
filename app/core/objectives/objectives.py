@@ -21,7 +21,7 @@ import asyncio
 import uuid
 import logging
 import threading
-from typing import Optional
+from typing import Dict, Optional
 from datetime import datetime, timedelta
 
 import pydantic.v1 as pydantic
@@ -31,7 +31,7 @@ from scipy.spatial.transform import Rotation as R
 from app.core.objectives.objective_behavior_tree import ObjectiveBehaviorTree
 from app.core.objectives.objectives_common import ObjectiveLeafNode
 from app.core.mission_control import MissionControl
-from app.common.models import MissionData, PickPlaceData, MultiObjectPickPlaceData
+from app.common.models import MissionData, PickPlaceData, MultiObjectPickPlaceData, ActionBlockingType
 from cloud_common.objects.common import ICSServerError, Pose3D
 from cloud_common.objects.objective import ObjectiveV1, ObjectiveStateV1, ObjectiveNodeType, ObjectiveNode
 from app.core.objectives.objectives_context import (
@@ -137,6 +137,14 @@ class AprilTagDetectionNodeSchema(pydantic.BaseModel):
 class SleepNodeSchema(pydantic.BaseModel):
     """Represents the parameters for a Sleep Node"""
     duration: float
+
+class ActionNodeSchema(pydantic.BaseModel):
+    """Represents the parameters for an ACTION Node"""
+    robot_name: str
+    action_type: str
+    action_parameters: Dict[str, str]
+    blocking_type: ActionBlockingType = ActionBlockingType.HARD
+    timeout_s: int = 600
 
 class ObjectiveServer:
     """The Objective Server will run one Objective to completion"""
@@ -330,6 +338,15 @@ class ObjectiveServer:
                         robot_obj = self.mc.robots.get_robot(apriltag_detection_parameters.robot_name)
                         
                         pending_mission_data.append(self.mc.submit_apriltag_detection_mission(robot_obj))
+                    elif objective_node.node_type == ObjectiveNodeType.ACTION:
+                        action_parameters = ActionNodeSchema(**objective_node.parameters)
+                        robot_obj = self.mc.robots.get_robot(action_parameters.robot_name)
+                        pending_mission_data.append(self.mc.submit_action_mission(
+                            robot=robot_obj,
+                            action_type=action_parameters.action_type,
+                            action_parameters=action_parameters.action_parameters,
+                            blocking_type=action_parameters.blocking_type,
+                            timeout_s=action_parameters.timeout_s))
                     elif objective_node.node_type == ObjectiveNodeType.SLEEP:
                         sleep_parameters = SleepNodeSchema(**objective_node.parameters)
                         sleep_mission_id = str(uuid.uuid4())

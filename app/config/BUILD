@@ -1,7 +1,7 @@
 exports_files([
     "defaults.yaml",
     "test_base.yaml",
-    "test_overrides.yaml"
+    "test_overrides.yaml",
 ])
 
 filegroup(

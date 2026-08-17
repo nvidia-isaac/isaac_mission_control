@@ -37,7 +37,7 @@ docks:
 # Galileo Hubble test overrides
 galileo_hubble:
   map:
-    map_file: "./config/maps/nvidia_galileo_hubble.png"
+    map_file: "/config/maps/nvidia_galileo_hubble.png"
     metadata:
       map_id: "galileo_hubble"
       resolution: 0.05
@@ -50,27 +50,6 @@ galileo_hubble:
           y: 19.7377
           yaw: 1.36224
       
-# Semantic map test overrides
-map_file_semantic:
-  map:
-    map_file: "./config/maps/elevator_office_1_semantic_map.json"
-    metadata:
-      map_id: "elevator_office"
-
-# Semantic map with dock test overrides
-map_file_semantic_with_dock:
-  map:
-    map_file: "./config/maps/galileo_with_docking_station_semantic_map.json"
-    metadata:
-      map_id: "galileo"
-    docks:
-      - dock_id: dock01
-        dock_type: nova_carter_dock
-        dock_pose:
-          x: 3.446205
-          y: 9.7845
-          yaw: 0
-
 # Robots test overrides
 robots:
   robots:
@@ -103,4 +82,4 @@ pickplace:
         recommended_minimum: 30
     - name: "robot_c"
       labels: ["test", "MANIPULATOR", "ros"]
-      heartbeat_timeout: 30 
+      heartbeat_timeout: 30

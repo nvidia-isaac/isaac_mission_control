@@ -37,7 +37,7 @@ services:
       verbose_mode: False
 
 map:
-  map_file: "./config/maps/test.png"
+  map_file: "/config/maps/test.png"
   metadata:
     map_id: "large_warehouse_navigation"
     resolution: 0.1

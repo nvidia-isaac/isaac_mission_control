@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -73,11 +73,7 @@ logging.debug("CONFIG_DIR: %s", CONFIG_DIR)
 class TestConfigKey(Enum):
     DOCKS = "docks"
     GALILEO_HUBBLE = "galileo_hubble"
-    MAP_FILE_SEMANTIC = "map_file_semantic"
-    MAP_FILE_SEMANTIC_WITH_DOCK = "map_file_semantic_with_dock"
-    MAP_FILE_S3 = "map_file_s3"
     ROBOTS = "robots"
-    REPLAN = "replan"
     PICKPLACE = "pickplace"
 
 
@@ -183,11 +179,11 @@ class TestContext:
 
             # Start Mission Simulator
             print("Starting Mission Simulator", flush=True)
-            self._sim_process, _ = self.run_docker(
+            self._sim_container_id, _ = self.run_docker_shelless(
                 "//app/tests/test_utils:mission-simulator-img-bundle",
                 docker_args=[
                     "--network", "host"],
-                args=["--robots", " ".join(str(robot) for robot in self._robots),
+                args=["--robots", *[str(robot) for robot in self._robots],
                       "--speed", str(SIM_SPEED),
                       "--mqtt_port", str(MQTT_PORT),
                       "--mqtt_host", self._mqtt_address,
@@ -197,20 +193,20 @@ class TestContext:
                     MQTT_WS_PATH),
                     "--mqtt_prefix", str(
                     MQTT_PREFIX)])
-            self.processes.append(self._sim_process)
+            self.containers.append(self._sim_container_id)
             time.sleep(2)  # Give the simulator a bit of time to start up.
 
             # Start Mission Database
             print("Starting Mission Database", flush=True)
-            self._database_process, self._database_address = \
-                self.run_docker(image="//app/tests/test_utils:mission-database-img-bundle",
+            self._database_container_id, self._database_address = \
+                self.run_docker_shelless(image="//app/tests/test_utils:mission-database-img-bundle",
                                 docker_args=["--network", "host"],
                                 args=["--port", str(DATABASE_PORT),
                                       "--controller_port", str(
                                           DATABASE_CONTROLLER_PORT),
                                       "--db_port", str(POSTGRES_PORT),
                                       "--address", "0.0.0.0"])
-            self.processes.append(self._database_process)
+            self.containers.append(self._database_container_id)
             # Wait for both broker and db to start
             test_utils.wait_for_port(
                 host=self._database_address, port=DATABASE_CONTROLLER_PORT, timeout=120)
@@ -325,11 +321,11 @@ class TestContext:
                 docker_args.extend(["-e", f"MC_ENABLE_CPU_FALLBACK={mc_fallback_env}"])
 
             print("Starting mission control", flush=True)
-            self._control_process, self._control_address = self.run_docker(
+            self._control_container_id, self._control_address = self.run_docker_shelless(
                 "//app:mission-control-img-bundle",
                 docker_args=docker_args,
                 args=["--config", config_arg])
-            self.processes.append(self._control_process)
+            self.containers.append(self._control_container_id)
             test_utils.wait_for_port(
                 host=self._control_address, port=MC_PORT, timeout=120)
             # Create mission control client (use actual container address not hardcoded localhost)
@@ -337,7 +333,7 @@ class TestContext:
                 "base_url": f"http://{self._control_address}:{MC_PORT}"}
 
             # Start mission dispatch (after mission control so we have _control_address)
-            self._md_process, _ = self.run_docker(
+            self._md_container_id, _ = self.run_docker_shelless(
                 "//app/tests/test_utils:mission-dispatch-img-bundle",
                 docker_args=["--network", "host"],
                 args=["--mqtt_port", str(MQTT_PORT),
@@ -349,7 +345,7 @@ class TestContext:
                       "--database_url", f"http://{self._database_address}:{DATABASE_CONTROLLER_PORT}",
                       "--mission_ctrl_url", f"http://{self._control_address}:{MC_PORT}"],
                 delay=delay.mission_dispatch)
-            self.processes.append(self._md_process)
+            self.containers.append(self._md_container_id)
 
             print("Test context initialized", flush=True)
         
@@ -418,7 +414,11 @@ class TestContext:
             raise
 
     def run_docker_shelless(self, image: str, args: list[str],
-                            docker_args: list[str]) -> tuple[str, str]:
+                            docker_args: list[str], delay: int = 0) -> tuple[str, str]:
+        # Shell-less (distroless) images can't do an in-container `sleep N; cmd`,
+        # so honor the requested delay on the host before launching.
+        if delay:
+            time.sleep(delay)
         docker_container_id, address = \
             test_utils.run_docker_target_shelless(
                 image, args=args, docker_args=docker_args)

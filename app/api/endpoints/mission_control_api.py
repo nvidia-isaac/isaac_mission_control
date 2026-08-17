@@ -14,7 +14,7 @@ from pydantic.v1 import ValidationError
 from app.core.mission_control import MissionControl
 from app.core.objectives.objectives import ObjectiveExecutor
 from app.api.clients.cuopt_client import CuOptOptimizationException
-from app.common.models import MissionData, PickPlaceData, MultiObjectPickPlaceData
+from app.common.models import MissionData, PickPlaceData, MultiObjectPickPlaceData, ActionData
 from cloud_common.objects.common import ICSError, ICSServerError
 from cloud_common.objects.objective import ObjectiveBehaviorNode, ObjectiveCompositeNode, ObjectiveDecoratorNode
 from app.api.endpoints.sap_api import router as sap_router
@@ -171,6 +171,23 @@ async def send_multi_object_pickplace_mission(robot_name: str, multi_object_pick
         robot_inventory = mc.robots
         robot = robot_inventory.get_robot(robot_name)
         return await mc.submit_multi_object_pickplace_mission(robot, multi_object_pickplace_data, mission_id)
+    except (ValidationError, ValueError, KeyError, ICSError) as exc:
+        logger.error(exc)
+        logger.error(exc.args[0])
+        raise HTTPException(status_code=400, detail=exc.args[0]) from exc
+
+
+@app.post("/mission/action", tags=["Main"])
+async def send_action_mission(robot_name: str, action_data: ActionData,
+                              mission_id: Optional[str] = None):
+    """ Send a generic action mission """
+    try:
+        mc = await mc_ready()
+        robot_inventory = mc.robots
+        robot = robot_inventory.get_robot(robot_name)
+        return await mc.submit_action_mission(
+            robot, action_data.action_type, action_data.action_parameters,
+            action_data.blocking_type, action_data.timeout_s, mission_id)
     except (ValidationError, ValueError, KeyError, ICSError) as exc:
         logger.error(exc)
         logger.error(exc.args[0])

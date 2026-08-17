@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -8,6 +8,7 @@
 
 # mypy: disable-error-code="union-attr"
 
+import asyncio
 import httpx
 import unittest
 from datetime import datetime, timedelta
@@ -17,6 +18,7 @@ from app.api.clients.mission_database_client import MissionDatabaseClient
 from app.core.mission_control_config import MissionControlConfig
 from app.tests import test_context
 from app.tests.test_context import TestConfigKey, verify_objective_node_states
+from cloud_common.objects.objective import ObjectiveStateV1
 from cloud_common.objects.robot import VDA5050AgvClass
 
 
@@ -133,6 +135,22 @@ OBJECTIVE_C_EXPECTED = {
         }
     ]
 }
+
+OBJECTIVE_ACTION = {
+    "node_class": "BEHAVIOR",
+    "node_type": "ACTION",
+    "parameters": {
+        "robot_name": "robot_a",
+        "action_type": "humanoid_manipulation",
+        "action_parameters": {
+            "task_category": "manipulation",
+            "task_id": "apple_to_plate",
+            "language_instruction": "pick up the apple and place it on the plate",
+            "timeout": "15.0"
+        }
+    }
+}
+
 
 OBJECTIVE_SLEEP = {
     "node_class": "BEHAVIOR",
@@ -420,6 +438,40 @@ class TestObjectives(unittest.IsolatedAsyncioTestCase):
             print(f"  Mission creation: Pickplace mission {pickplace_node.mission_id}")
             print(f"  Values: object_id={resolved_object_id}, pos=({resolved_pos_x}, "
                   f"{resolved_pos_y}, {resolved_pos_z})")
+
+    async def test_action_node(self):
+        """Test ACTION node is accepted and transitions to RUNNING state.
+
+        The simulator does not execute humanoid_manipulation actions, so this test
+        only verifies that MC correctly accepts and dispatches the objective — not
+        that the robot completes the action.
+        """
+        with test_context.TestContext(config_overrides=None,
+                                      async_client=self.client) as ctx:
+            mission_control_client = MissionControlClient(
+                config=ctx.mission_control_config, client=self.client)
+            mission_database_client = MissionDatabaseClient(
+                ctx.mission_database_config, client=self.client)
+
+            mc_online = await mission_control_client.wait_for_mc_alive()
+            assert mc_online
+
+            robots_online = await mission_database_client.wait_for_robots(robots=["robot_a"])
+            assert robots_online
+
+            objective_id = await mission_control_client.submit_objective(OBJECTIVE_ACTION)
+            assert objective_id
+
+            # Poll until the objective leaves PENDING (i.e. MC has dispatched it to the robot)
+            deadline = asyncio.get_event_loop().time() + 30
+            while asyncio.get_event_loop().time() < deadline:
+                obj = await mission_database_client.get_objective(objective_id)
+                if obj.status.state != ObjectiveStateV1.PENDING:
+                    break
+                await asyncio.sleep(1)
+
+            obj = await mission_database_client.get_objective(objective_id)
+            assert obj.status.state in (ObjectiveStateV1.RUNNING, ObjectiveStateV1.COMPLETED)
 
     async def test_sleep_node(self):
         """Test sleep node"""

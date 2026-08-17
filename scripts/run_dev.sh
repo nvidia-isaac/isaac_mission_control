@@ -7,23 +7,29 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
+# Enters the developer container. The image is built (if missing or stale) by
+# scripts/build_dev_image.sh.
+
 set -e
 
 # Create bazel cache directory if it doesn't exist
 if [ ! -d "$HOME/.cache/bazel" ]; then
   # Folder does not exist, so create it
-  mkdir "$HOME/.cache/bazel"
+  mkdir -p "$HOME/.cache/bazel"
 fi
 
 # Create pip-tools cache directory if it doesn't exist
 if [ ! -d "$HOME/.cache/pip-tools" ]; then
   # Folder does not exist, so create it
-  mkdir "$HOME/.cache/pip-tools"
+  mkdir -p "$HOME/.cache/pip-tools"
 fi
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/.. >/dev/null 2>&1 && pwd )"
-docker build --network host -t isaac-mission-control-dev "${ROOT}/docker" \
---build-arg docker_id="$(getent group docker | cut -d: -f3)"
+IMAGE_NAME="isaac-mission-control-dev"
+DOCKER_GROUP_ID="$(getent group docker | cut -d: -f3)"
+
+# Ensure the dev container image exists and is fresh.
+"${ROOT}/scripts/build_dev_image.sh"
 
 docker run -it --rm \
 --gpus all \
@@ -47,5 +53,5 @@ docker run -it --rm \
 -v "$HOME/.cache/pip-tools:$HOME/.cache/pip-tools" \
 -v /var/run/docker.sock:/var/run/docker.sock \
 -u $(id -u) \
---group-add $(getent group docker | cut -d: -f3) \
-isaac-mission-control-dev /bin/bash
+--group-add "$DOCKER_GROUP_ID" \
+"$IMAGE_NAME" /bin/bash

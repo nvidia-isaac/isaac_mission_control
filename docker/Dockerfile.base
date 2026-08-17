@@ -15,7 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-FROM nvcr.io/nvidia/base/ubuntu:22.04_20240212
+FROM nvcr.io/nvidia/base/ubuntu:jammy-20260217
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install python
@@ -23,10 +23,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        software-properties-common \
         gnupg && \
-    add-apt-repository -y ppa:deadsnakes/ppa && \
-    apt-get update && \
     apt-get install -y --no-install-recommends \
         bash \
         python3.10 \

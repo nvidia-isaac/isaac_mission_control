@@ -86,11 +86,10 @@ Developers can choose to run `mission-control` with the `--dev` option to enable
 Best practice is to have simulated robots execute missions:
 
 ```
-docker run -it --network host nvcr.io/nvidia/isaac/mission-simulator:4.3.0-amd64 --robots robot_a,4,5 robot_b,5,6
-
-# Use nvcr.io/nvidia/isaac/mission-simulator:4.3.0-arm64 instead if on an ARM64 machine
+docker run -it --network host nvcr.io/nvidia/isaac/mission-simulator:4.6.0 --robots robot_a,4,5 robot_b,5,6
 ```
 
+If you want to start the whole stack, including Mission Control, from Docker Compose:
 
 ```
 docker compose -f docker-compose/bringup_services.yaml --profile enable_mission_control up
@@ -101,7 +100,7 @@ docker compose -f docker-compose/bringup_services.yaml --profile enable_mission_
 If you want to start the whole stack, including Mission Control, from Docker Compose:
 
 ```
-cd docker_compose
+cd docker-compose
 docker compose -f bringup_services.yaml --profile enable_mission_control up
 # run `docker compose -f bringup_services.yaml --profile enable_mission_control down` if you want to bring down all the services.
 ```
@@ -109,9 +108,31 @@ docker compose -f bringup_services.yaml --profile enable_mission_control up
 If you're on a supported ARM64 machine such as the DGX Spark, run this instead:
 
 ```
-cd docker_compose
+cd docker-compose
 docker compose -f bringup_services_arm64.yaml --profile enable_mission_control up
 ```
+
+### Extend and use Mission Control
+
+Robot fleet management has not been built into Mission Control at this time. Mission Control requires defaults be populated with robots that are under Mission Dispatch control in the defaults.yaml config file. If you choose to use another pre-loaded map, this can be changed in the same location.
+
+### Waypoint Selection Tool
+
+The Waypoint Selection Tool is a web-based interface for the creation and visualization of waypoint paths for robot navigation. It provides:
+
+- Load and configure map images
+- Select waypoints through an interactive interface
+- Generate and visualize robot routes
+- Export waypoint data for use with Mission Control
+
+The tool is particularly useful for:
+
+- Planning robot navigation paths
+- Testing mission routes before deployment
+- Visualizing robot trajectories
+- Configuring waypoint-based missions
+
+To get started with the Waypoint Selection Tool, see the [detailed documentation](waypoint_selection_ui/README.md).
 
 ### Map Update Workflow
 
@@ -136,28 +157,6 @@ Supported REST endpoints (prefixed with `/api/v1`):
 Note: `/map/update_robot/{robot_name}/{map_id}` returns HTTP 409 Conflict if the target robot is not IDLE or its status cannot be validated.
 
 ---
-
-### Extend and use Mission Control
-
-Robot fleet management has not been built into Mission Control at this time. Mission Control requires defaults be populated with robots that are under Mission Dispatch control in the defaults.yaml config file. If you choose to use another pre-loaded map, this can be changed in the same location.
-
-### Waypoint Selection Tool
-
-The Waypoint Selection Tool is a web-based interface for the creation and visualization of waypoint paths for robot navigation. It provides:
-
-- Load and configure map images
-- Select waypoints through an interactive interface
-- Generate and visualize robot routes
-- Export waypoint data for use with Mission Control
-
-The tool is particularly useful for:
-
-- Planning robot navigation paths
-- Testing mission routes before deployment
-- Visualizing robot trajectories
-- Configuring waypoint-based missions
-
-To get started with the Waypoint Selection Tool, see the [detailed documentation](waypoint_selection_ui/README.md).
 
 ### SAP EWM Integration (Optional)
 
@@ -225,6 +224,7 @@ Mission Control adds additional robot types to support more specialized use case
 
 | Mission Control Version | Changes |
 | ----- | ----- |
+| 4.6.0 | Add VDA5050 Action node |
 | 4.3.0 | ARM64 support for DGX Spark, Map distribution API |
 | 4.0.0 | Objectives, navigate to exact position |
 | 3.2.0 | Initial release |
