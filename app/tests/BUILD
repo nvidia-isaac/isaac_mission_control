@@ -25,7 +25,8 @@ mission_control_py_library(
         "//app/tests/test_utils:waypoint-graph-generator-img-bundle",
         "//app/tests/test_utils:cuopt-img-bundle",
         "//app/config:test_overrides.yaml",
-        "//app/config:test_base.yaml"
+        "//app/config:test_base.yaml",
+        "//app/config:map_dir"
     ],
     deps=[
         "//app/api",
@@ -247,6 +248,8 @@ mission_control_py_test(
         "supports-graceful-termination"
     ],
 )
+
+mission_control_py_test(
 
 mission_control_py_test(
     name="objectives_decorators_test",

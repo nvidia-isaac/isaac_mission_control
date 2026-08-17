@@ -35,6 +35,8 @@ OP_HEALTH_CHECK = "health_check"
 OP_SUBMIT_NAVIGATION = "submit_navigation_mission"
 OP_SUBMIT_CHARGING = "submit_charging_mission"
 OP_SUBMIT_UNDOCK = "submit_undock_mission"
+OP_SUBMIT_MULTI_OBJECT_PICK_AND_PLACE = "submit_multi_object_pick_and_place_mission"
+OP_SUBMIT_ACTION = "submit_action_mission"
 
 
 class MissionControlClientError(Exception):
@@ -73,6 +75,8 @@ class MissionControlClient:
             OP_SUBMIT_NAVIGATION: 45.0,
             OP_SUBMIT_CHARGING: 20.0,
             OP_SUBMIT_UNDOCK: 20.0,
+            OP_SUBMIT_MULTI_OBJECT_PICK_AND_PLACE: 120.0,
+            OP_SUBMIT_ACTION: 30.0,
         }
         if request_timeouts:
             self.request_timeouts.update(request_timeouts)
@@ -275,36 +279,51 @@ class MissionControlClient:
         """Download and enable a map on a specific robot"""
         return self._make_request("post", f"map/update_robot/{robot_name}/{map_id}")
 
-    def submit_pick_and_place(
+    def submit_action_mission(
         self,
         robot_name: str,
-        object_id: int,
-        class_id: str,
-        pos_x: float,
-        pos_y: float,
-        pos_z: float,
-        quat_x: float,
-        quat_y: float,
-        quat_z: float,
-        quat_w: float,
+        action_type: str,
+        action_parameters: Optional[Dict[str, str]] = None,
+        blocking_type: str = "HARD",
+        timeout_s: int = 600,
     ) -> Dict:
-        """Submit a pick and place mission"""
+        """Submit an arbitrary action mission to a robot."""
         params = {"robot_name": robot_name}
-        pick_place_data = {
-            "object_id": object_id,
-            "class_id": class_id,
-            "pos_x": pos_x,
-            "pos_y": pos_y,
-            "pos_z": pos_z,
-            "quat_x": quat_x,
-            "quat_y": quat_y,
-            "quat_z": quat_z,
-            "quat_w": quat_w,
+        json_data: Dict[str, Any] = {
+            "action_type": action_type,
+            "action_parameters": action_parameters or {},
+            "blocking_type": blocking_type,
+            "timeout_s": timeout_s,
         }
         return self._make_request(
             "post",
-            "mission/pick_and_place",
+            "mission/action",
             params=params,
-            json_data=pick_place_data,
+            json_data=json_data,
+            operation=OP_SUBMIT_ACTION,
+            timeout=float(timeout_s) + 5.0,
+        )
+
+    def submit_multi_object_pick_and_place(
+        self,
+        robot_name: str,
+        mode: str,
+        class_ids: List[str],
+        frame_id: str,
+        poses: List[Dict[str, Any]],
+    ) -> Dict:
+        """Submit a multi-object pick and place mission (VDA multi_object_pick_and_place)."""
+        params = {"robot_name": robot_name}
+        json_data: Dict[str, Any] = {
+            "mode": mode,
+            "class_ids": class_ids,
+            "target_poses": {"frame_id": frame_id, "poses": poses},
+        }
+        return self._make_request(
+            "post",
+            "mission/multi_object_pickplace",
+            params=params,
+            json_data=json_data,
+            operation=OP_SUBMIT_MULTI_OBJECT_PICK_AND_PLACE,
         )
 

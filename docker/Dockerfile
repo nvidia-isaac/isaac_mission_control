@@ -6,14 +6,13 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-FROM nvcr.io/nvidia/base/ubuntu:jammy-20251013
+FROM nvcr.io/nvidia/base/ubuntu:jammy-20260217
 #FROM nvcr.io/nvidia/base/ubuntu:22.04_20240212
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install python
 RUN apt update && \
-    apt install -y ca-certificates curl software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
+    apt install -y ca-certificates curl && \
     apt install -y bash python3.10 python3.10-dev python3.10-distutils
 
 # Create symlinks
@@ -46,7 +45,6 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 RUN chmod +x /usr/bin/bazel
 
 # Install docker and nvidia-container-toolkit
-RUN apt-get update
 RUN apt-get install -y gnupg lsb-release git
 RUN git config --global --add safe.directory '*'
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg

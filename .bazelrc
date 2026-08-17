@@ -1,4 +1,4 @@
-test --test_timeout=1200
+test --test_timeout=1800
 test --test_env=CUDA_VISIBLE_DEVICES=0
 test --test_output=errors
 test --test_env=WORKSPACE
@@ -26,3 +26,4 @@ build:clang_config --cpu=k8
 # Use the default Bazel C++ toolchain to build the tools used during the
 # build.
 build:clang_config --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+

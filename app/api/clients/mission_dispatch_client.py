@@ -10,12 +10,12 @@ import asyncio
 import enum
 import json
 import time
-from typing import Optional
+from typing import Dict, Optional
 from httpx import HTTPError
 
 from app.api.clients.base_api_client import BaseAPIClient
 from cloud_common.objects.robot import RobotObjectV1
-from app.common.models import PickPlaceData, NVActionType, MultiObjectPickPlaceData
+from app.common.models import PickPlaceData, NVActionType, MultiObjectPickPlaceData, ActionBlockingType
 
 
 class MissionDispatchClient(BaseAPIClient):
@@ -229,6 +229,39 @@ class MissionDispatchClient(BaseAPIClient):
         return await self.make_request_with_logs("post", endpoint,
                                                  "Failed to create multi-object pickplace mission.",
                                                  "Created multi-object pickplace mission.",
+                                                 json=data)
+
+    async def create_action_mission(self, robot: str, action_type: str,
+                                     action_parameters: Dict[str, str],
+                                     blocking_type: ActionBlockingType = ActionBlockingType.HARD,
+                                     timeout_s: int = 600,
+                                     mission_id: Optional[str] = None):
+        """
+        Create a mission dispatching an arbitrary action to a robot.
+        Input: robot name, action type string, action parameters dict,
+            blocking type (HARD/SOFT/NONE), timeout in seconds, optional mission id
+        Returns: response json from submitting the mission
+        """
+        self._logger.info("Sending action mission to Mission Dispatch")
+        timeout_s = max(self._config["default_mission_timeout"], timeout_s)
+
+        endpoint_info = self._endpoints["mission"]
+        endpoint = self._base_url + endpoint_info["path"]
+        action = {
+            "action_type": action_type,
+            "blocking_type": blocking_type,
+            "action_parameters": action_parameters
+        }
+        data = {
+            "robot": robot,
+            "mission_tree": [{"action": action}],
+            "timeout": timeout_s
+        }
+        if mission_id:
+            data["name"] = mission_id
+        return await self.make_request_with_logs("post", endpoint,
+                                                 "Failed to create VDA5050 action mission.",
+                                                 "Created VDA5050 action mission.",
                                                  json=data)
 
     async def get_available_objects(self, robot: str):

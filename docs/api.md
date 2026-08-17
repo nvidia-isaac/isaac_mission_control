@@ -137,6 +137,46 @@ JSON Structure
 
 **Response:** Same as `/mission/submit_mission`
 
+### **POST** /mission/action
+
+Send a generic VDA5050 action to a robot at its current position. This endpoint does not require navigation — the action is dispatched directly to the robot. Use it for any robot capability exposed as a VDA5050 action type (e.g. manipulation, inspection) without needing a dedicated endpoint per capability.
+
+**Query Parameters:**
+| Parameter | Required? | Type | Description |
+| ----------- | ----------- | ---- | ------------|
+| robot_name | Yes | string | Name of the robot to send the action to. |
+| mission_id | No | string | Text identifier to refer to this mission. |
+
+**Request Body:**
+
+JSON Structure
+| Element | Required? | Type | Description |
+| ----------- | ----------- | ---- | ------------|
+| action_type | Yes | string | VDA5050 `actionType` string (e.g. `humanoid_manipulation`). |
+| action_parameters | Yes | dict[str, str] | Flat key-value map of action parameters. All values must be strings. |
+| blocking_type | No | string | VDA5050 blocking type: `HARD`, `SOFT`, or `NONE`. Defaults to `HARD`. |
+| timeout_s | No | integer | Mission timeout in seconds. Defaults to `600`. |
+
+> **Note:** `action_parameters` values must all be strings. Pass numeric values as quoted strings (e.g. `"timeout": "15.0"`, not `"timeout": 15.0`).
+
+**Example Request Body:**
+
+```json
+{
+  "action_type": "humanoid_manipulation",
+  "action_parameters": {
+    "task_category": "manipulation",
+    "task_id": "apple_to_plate",
+    "language_instruction": "pick up the apple and place it on the plate",
+    "timeout": "15.0"
+  },
+  "blocking_type": "HARD",
+  "timeout_s": 60
+}
+```
+
+**Response:** Same as `/mission/submit_mission`
+
 ### **GET /api/v1/health**
 
 **Query Parameters: None**  
@@ -191,10 +231,11 @@ codes that each documented endpoint may return.
 
 | Endpoint | 400 – Bad Request | 404 – Not Found | 409 - Conflict | 500 – Internal | 503 – Unavailable |
 |----------|------------------|-----------------|----------------|-----------------|-------------------|
-| **POST** `/mission/submit_mission` | Invalid route data, unknown robot, cuOpt failure | — | mission_id conflict |— | MC not initialised |
-| **POST** `/mission/charging` | Invalid parameters, robot offline | — | mission_id conflict |— | MC not initialised |
+| **POST** `/mission/submit_mission` | Invalid route data, unknown robot, cuOpt failure | — | mission_id conflict | — | MC not initialised |
+| **POST** `/mission/charging` | Invalid parameters, robot offline | — | mission_id conflict | — | MC not initialised |
 | **POST** `/mission/undock` | Invalid parameters | — | mission_id conflict | — | MC not initialised |
 | **POST** `/mission/pick_and_place` | Validation errors | — | mission_id conflict | — | MC not initialised |
+| **POST** `/mission/action` | Invalid parameters, robot offline, non-string action_parameter values | — | — | MC not initialised |
 | **POST** `/visualize_route` | Invalid mission data | — | - | — | MC not initialised |
 | **GET** `/mission/get_available_objects` | Invalid robot name | — | - | — | MC not initialised |
 | **GET/POST** `/health` | — | — | - | — | MC not initialised |

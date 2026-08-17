@@ -49,7 +49,8 @@ from app.api.clients.waypoint_graph_generator_client import (
 from app.common.waypoint_graph import WaypointGraph
 from app.common.models import (
     MissionData, SolverType, MissionType, MissionDataExtend,
-    PickPlaceData, RouteVisualizationData, MultiObjectPickPlaceData
+    PickPlaceData, RouteVisualizationData, MultiObjectPickPlaceData,
+    ActionBlockingType,
 )
 
 from cloud_common import objects
@@ -149,6 +150,8 @@ class MissionControl:
 
         self.wpg_cache = await self.wpg_client.request_new_graph()
 
+        # TODO: Investigate - Creating robots this way will cause missing robots in Dispatch occasionally
+        # results = await self.mission_database_client.create_robots_if_new(self.robots.get_robots())
         results = []
         for robot in self.robots.get_robots():
             new_robot = await self.mission_database_client.create_robot_if_new(robot)
@@ -662,6 +665,30 @@ class MissionControl:
         
         submission = await self.mission_dispatch_client.get_available_apriltags(robot.name)
         mission_data_extend = MissionDataExtend(route=[])
+        mission_data_extend.sub_mission_uuids.append(submission["name"])
+        mission_data_extend.robots.append(robot.name)
+        return mission_data_extend
+
+    async def submit_action_mission(self, robot: RobotObjectV1,
+                                     action_type: str,
+                                     action_parameters: Dict[str, str],
+                                     blocking_type: ActionBlockingType = ActionBlockingType.HARD,
+                                     timeout_s: int = 600,
+                                     mission_id: Optional[str] = None):
+        """ Create a new action mission and execute it """
+        await self.raise_if_mission_exists(mission_id)
+        self.logger.info("Creating action mission: %s for robot %s", action_type, robot.name)
+
+        db_robot = await self.mission_database_client.get_robot(robot.name)
+        if not db_robot:
+            raise ICSUsageError(f"No robot named {robot.name}")
+        if not db_robot.status.online:
+            raise ICSServerError(f"Robot {robot.name} is not online")
+
+        mission_data_extend = MissionDataExtend(route=[])
+        submission = await self.mission_dispatch_client.create_action_mission(
+            robot.name, action_type, action_parameters, blocking_type,
+            timeout_s=timeout_s, mission_id=mission_id)
         mission_data_extend.sub_mission_uuids.append(submission["name"])
         mission_data_extend.robots.append(robot.name)
         return mission_data_extend

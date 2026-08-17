@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/base/ubuntu:22.04_20240212
+FROM nvcr.io/nvidia/base/ubuntu:jammy-20260217
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install python

@@ -8,8 +8,15 @@
 
 import enum
 import pydantic.v1 as pydantic
-from typing import Optional
+from typing import Dict, Optional
 from cloud_common.objects.common import ICSUsageError, Point2D, Pose3D
+
+
+class ActionBlockingType(str, enum.Enum):
+    """Blocking behavior for a generic action: whether the robot waits for completion."""
+    HARD = "HARD"
+    SOFT = "SOFT"
+    NONE = "NONE"
 
 
 class NVActionType(str, enum.Enum):
@@ -34,6 +41,7 @@ class NVActionType(str, enum.Enum):
 class SolverType(str, enum.Enum):
     CPU_DIJKSTRA = "CPU_DIJKSTRA"
     NVIDIA_CUOPT = "NVIDIA_CUOPT"
+
 
 
 class WarehouseOrderStatus(str, enum.Enum):
@@ -207,3 +215,11 @@ class MultiObjectPickPlaceData(pydantic.BaseModel):
         if values["mode"] == MultiObjectPickPlaceModes.SINGLE_BIN and len(v.poses) != 1:
             raise ICSUsageError("Single bin mode requires exactly 1 target pose")
         return v
+
+
+class ActionData(pydantic.BaseModel):
+    """Schema for a generic action mission."""
+    action_type: str
+    action_parameters: Dict[str, str]
+    blocking_type: ActionBlockingType = ActionBlockingType.HARD
+    timeout_s: int = 600

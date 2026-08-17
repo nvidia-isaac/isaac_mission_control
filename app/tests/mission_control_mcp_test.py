@@ -25,7 +25,8 @@ import asyncio
 from mcp.types import CallToolResult, TextContent
 from src import server as mcp_server
 from app.tests import test_context
-from app.api.clients.mission_database_client import MissionDatabaseClient
+from app.tests.test_context import TestConfigKey
+from cloud_common.objects.robot import VDA5050AgvClass
 
 
 SUPPORTED_TOOLS = {
@@ -33,6 +34,8 @@ SUPPORTED_TOOLS = {
     "submit_navigation_mission",
     "submit_charging_mission",
     "submit_undock_mission",
+    "submit_multi_object_pick_and_place",
+    "submit_action_mission",
 }
 
 UNSUPPORTED_TOOLS = [
@@ -45,8 +48,8 @@ UNSUPPORTED_TOOLS = [
     "deploy_map_to_robot",
     "submit_objective",
     "cancel_objective",
-    "submit_pick_and_place",
 ]
+
 
 def _result_text(result: CallToolResult) -> str:
     assert result.content, "Expected tool result content to be non-empty"
@@ -134,18 +137,6 @@ class TestMissionControlMcpTools(unittest.IsolatedAsyncioTestCase):
                 self._point_mcp_server_to_test_context(ctx)
                 await self._wait_for_mission_control_ready(client)
 
-                # Wait for robot_a to be online and have pose in the database
-                mission_database_client = MissionDatabaseClient(
-                    ctx.mission_database_config, client=client
-                )
-                robots_ready = await mission_database_client.wait_for_robots(
-                    robots=["robot_a"], timeout=60.0
-                )
-                self.assertTrue(
-                    robots_ready,
-                    "robot_a did not become online and IDLE before timeout",
-                )
-
                 result = await mcp_server.call_tool("test_mission_control_connection", {})
                 self.assertFalse(result.isError)
                 self.assertIn("Mission Control Connection OK", _result_text(result))
@@ -176,6 +167,155 @@ class TestMissionControlMcpTools(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertFalse(undock_result.isError)
                 self.assertIn("Undock Mission Submitted", _result_text(undock_result))
+        finally:
+            mcp_server.base_url = original_base_url
+            mcp_server.mc_client.base_url = original_client_base_url
+            await client.aclose()
+
+    async def test_submit_multi_object_pick_and_place_single_bin(self) -> None:
+        """Multi-object pick-and-place MCP tool (SINGLE_BIN) against Mission Control."""
+        client = httpx.AsyncClient(timeout=120.0)
+        original_base_url = mcp_server.base_url
+        original_client_base_url = mcp_server.mc_client.base_url
+        robots = [
+            test_context.RobotInit(
+                "robot_a",
+                35,
+                35,
+                battery=100,
+                robot_type=VDA5050AgvClass.MANIPULATOR,
+            )
+        ]
+        try:
+            async with test_context.TestContext(
+                async_client=client,
+                config_overrides=test_context.get_test_config(TestConfigKey.PICKPLACE),
+                robots=robots,
+            ) as ctx:
+                self._point_mcp_server_to_test_context(ctx)
+                await self._wait_for_mission_control_ready(client, timeout_s=120.0)
+                assert await ctx.mission_database_client.wait_for_robots(["robot_a"], timeout=60)
+
+                mopp_args = {
+                    "robot_name": "robot_a",
+                    "mode": "SINGLE_BIN",
+                    "class_ids": [],
+                    "frame_id": "base_link",
+                    "poses": [
+                        {
+                            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                            "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                        }
+                    ],
+                }
+                result = await mcp_server.call_tool(
+                    "submit_multi_object_pick_and_place", mopp_args
+                )
+                self.assertFalse(result.isError, _result_text(result))
+                self.assertIn(
+                    "Multi-Object Pick and Place Mission Submitted", _result_text(result)
+                )
+                self.assertIn("SINGLE_BIN", _result_text(result))
+                self.assertIn("robot_a", _result_text(result))
+        finally:
+            mcp_server.base_url = original_base_url
+            mcp_server.mc_client.base_url = original_client_base_url
+            await client.aclose()
+
+    async def test_submit_multi_object_pick_and_place_multi_bin(self) -> None:
+        """Multi-object pick-and-place MCP tool (MULTI_BIN) against Mission Control."""
+        client = httpx.AsyncClient(timeout=120.0)
+        original_base_url = mcp_server.base_url
+        original_client_base_url = mcp_server.mc_client.base_url
+        robots = [
+            test_context.RobotInit(
+                "robot_a",
+                35,
+                35,
+                battery=100,
+                robot_type=VDA5050AgvClass.MANIPULATOR,
+            )
+        ]
+        try:
+            async with test_context.TestContext(
+                async_client=client,
+                config_overrides=test_context.get_test_config(TestConfigKey.PICKPLACE),
+                robots=robots,
+            ) as ctx:
+                self._point_mcp_server_to_test_context(ctx)
+                await self._wait_for_mission_control_ready(client, timeout_s=120.0)
+                assert await ctx.mission_database_client.wait_for_robots(["robot_a"], timeout=60)
+
+                mopp_args = {
+                    "robot_name": "robot_a",
+                    "mode": "MULTI_BIN",
+                    "class_ids": ["class_a", "class_b"],
+                    "frame_id": "base_link",
+                    "poses": [
+                        {
+                            "position": {"x": 0.1, "y": 0.0, "z": 0.0},
+                            "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                        },
+                        {
+                            "position": {"x": 0.2, "y": 0.0, "z": 0.0},
+                            "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                        },
+                    ],
+                }
+                result = await mcp_server.call_tool(
+                    "submit_multi_object_pick_and_place", mopp_args
+                )
+                self.assertFalse(result.isError, _result_text(result))
+                self.assertIn(
+                    "Multi-Object Pick and Place Mission Submitted", _result_text(result)
+                )
+                self.assertIn("MULTI_BIN", _result_text(result))
+                self.assertIn("robot_a", _result_text(result))
+        finally:
+            mcp_server.base_url = original_base_url
+            mcp_server.mc_client.base_url = original_client_base_url
+            await client.aclose()
+
+    async def test_submit_action_mission(self) -> None:
+        """Action mission MCP tool dispatches an action to a robot."""
+        client = httpx.AsyncClient(timeout=120.0)
+        original_base_url = mcp_server.base_url
+        original_client_base_url = mcp_server.mc_client.base_url
+        robots = [
+            test_context.RobotInit(
+                "robot_a",
+                25,
+                25,
+                battery=100,
+                robot_type=VDA5050AgvClass.CARRIER,
+            )
+        ]
+        try:
+            async with test_context.TestContext(
+                async_client=client,
+                config_overrides=None,
+                robots=robots,
+            ) as ctx:
+                self._point_mcp_server_to_test_context(ctx)
+                await self._wait_for_mission_control_ready(client, timeout_s=120.0)
+                assert await ctx.mission_database_client.wait_for_robots(["robot_a"], timeout=60)
+
+                action_args = {
+                    "robot_name": "robot_a",
+                    "action_type": "humanoid_manipulation",
+                    "action_parameters": {
+                        "task_category": "manipulation",
+                        "task_id": "apple_to_plate",
+                        "language_instruction": "pick up the apple and place it on the plate",
+                        "timeout": "15.0",
+                    },
+                    "blocking_type": "NONE",
+                }
+                result = await mcp_server.call_tool("submit_action_mission", action_args)
+                self.assertFalse(result.isError, _result_text(result))
+                self.assertIn("Action Mission Submitted", _result_text(result))
+                self.assertIn("humanoid_manipulation", _result_text(result))
+                self.assertIn("robot_a", _result_text(result))
         finally:
             mcp_server.base_url = original_base_url
             mcp_server.mc_client.base_url = original_client_base_url
