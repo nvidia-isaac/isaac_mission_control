@@ -1,10 +1,19 @@
-# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import enum
 import math
@@ -14,7 +23,7 @@ import mimetypes
 import os
 from typing import Optional
 
-import pydantic.v1 as pydantic
+import pydantic
 import requests
 import yaml
 import numpy as np
@@ -51,7 +60,8 @@ class ROSMapMetadata(pydantic.BaseModel):
     free_thresh: float = pydantic.Field(0.196, description="Threshold for free cells")
     safety_distance: float = pydantic.Field(default=0.45, description="Safety distance in meters")
 
-    @pydantic.validator('origin')
+    @pydantic.field_validator('origin')
+    @classmethod
     def check_origin_length(cls, v):
         if len(v) != 3:
             raise ValueError('origin must have exactly 3 items')
@@ -137,7 +147,8 @@ class MapConfig(pydantic.BaseModel):
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Error applying metadata yaml: %s", e)
 
-    @pydantic.root_validator(pre=True)
+    @pydantic.model_validator(mode="before")
+    @classmethod
     def validate_one_of_map_sources(cls, values):
         if sum([bool(values.get("map_file")),
                 bool(values.get("map_uri")),
@@ -212,7 +223,7 @@ class MapConfig(pydantic.BaseModel):
         elif self.map_uri:
             data.update({"map_uri": self.map_uri})
         if self.metadata and (self.map_file or self.map_uri or self.map_s3):
-            data.update(self.metadata)
+            data.update(self.metadata.model_dump(mode="json"))
         return data
 
     def map_id(self) -> str:

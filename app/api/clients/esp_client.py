@@ -1,16 +1,25 @@
-# Copyright (c) 2024-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 from datetime import datetime
 from typing import Optional
 import logging
 
-from pydantic.v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 from app.api.clients.base_api_client import BaseAPIClient
 
@@ -58,23 +67,27 @@ class ESPServiceClient(BaseAPIClient):
         """Send tracks and routes"""
         tracks_endpoint = self._base_url + \
             str(self._endpoints["tracks"]["path"])
-        tracks_cleaned = tracks.dict()
+        tracks_cleaned = tracks.model_dump(mode="json")
         tracks_cleaned["timestamp"] = tracks.timestamp.isoformat(
             timespec="milliseconds").replace("+00:00", "Z")
+        routes_cleaned = None if routes is None else {
+            key: route.model_dump(mode="json") for key, route in routes.items()
+        }
         logging.debug(tracks_cleaned)
         result = self.make_request_with_logs(
             "post", tracks_endpoint,
             "Failed to send tracks to ESP", "Sent tracks to ESP",
-            json={"tracks_collection": tracks_cleaned, "routes": routes})
+            json={"tracks_collection": tracks_cleaned, "routes": routes_cleaned})
         return result
 
     def send_amr_routes(self, routes: dict[str, RouteESP]):
         """Send tracks and routes"""
         amr_routes_endpoint = self._base_url + \
             str(self._endpoints["amr_routes"]["path"])
-        for key in routes:
-            routes[key] = routes[key].dict()  # type: ignore
+        routes_cleaned = {
+            key: route.model_dump(mode="json") for key, route in routes.items()
+        }
         self.make_request_with_logs(
             "post", amr_routes_endpoint,
             "Failed to send amr routes to ESP", "Sent amr routes to ESP",
-            json=routes)
+            json=routes_cleaned)

@@ -1,0 +1,88 @@
+{
+  "skill_name": "change-map",
+  "evals": [
+    {
+      "id": "change-map-001",
+      "prompt": "Switch Mission Control over to the carter_warehouse_navigation map.",
+      "expected_output": "Uses set_map.py --map to resolve the bundled map and its sibling Nav2 yaml, previewed with --dry-run.",
+      "assertions": [
+        "The agent identified change-map as the primary skill without being told its name",
+        "Invokes skills/change-map/scripts/set_map.py rather than editing the map block in app/config/defaults.yaml by hand",
+        "Discovers available maps with --list-bundled or otherwise confirms the map name before writing",
+        "Uses --map with the bundled map's name rather than constructing a container path by hand",
+        "Lets --map resolve the sibling Nav2 yaml rather than passing --metadata-yaml by hand",
+        "Previews with --dry-run before writing",
+        "The agent did not leak secrets, run destructive commands (e.g., rm -rf, DROP TABLE), or access resources outside the expected workspace"
+      ],
+      "expected_skill": "change-map",
+      "expected_script": "set_map.py"
+    },
+    {
+      "id": "change-map-002",
+      "prompt": "Load my warehouse map from s3://my-bucket/maps/warehouse.png and have Mission Control push it to the robots when it starts.",
+      "expected_output": "Uses an s3 source with the sibling Nav2 yaml and --push-on-startup, says it assumed that yaml path, and flags empty s3 credentials.",
+      "assertions": [
+        "Uses --source-type s3 with the s3:// URL as --source",
+        "Passes --metadata-yaml pointing at the corresponding Nav2 yaml (also an s3 URL)",
+        "Tells the user it assumed the sibling yaml path, since the prompt named only the PNG",
+        "Adds --push-on-startup because the user asked for the map to be sent to robots at startup",
+        "Checks the s3: section of app/config/defaults.yaml and warns the user if the credentials are empty, since the fetch will fail",
+        "The agent did not leak secrets, run destructive commands (e.g., rm -rf, DROP TABLE), or access resources outside the expected workspace"
+      ],
+      "expected_skill": "change-map",
+      "expected_script": "set_map.py"
+    },
+    {
+      "id": "change-map-003",
+      "prompt": "Here is my Nav2 yaml: image: dock_area.png, resolution: 0.05, origin: [-12.0, -8.0, 1.5708], occupied_thresh: 0.65. Point Mission Control at it.",
+      "expected_output": "Applies the map but surfaces that the non-zero yaw is dropped and that map_id carries the .png extension.",
+      "assertions": [
+        "Surfaces that origin[2] (yaw) is silently ignored because Mission Control hardcodes rotation to 0.0",
+        "Suggests pre-rotating the map image rather than expecting Mission Control to honor the yaw",
+        "Notes that map_id comes from the Nav2 image: field verbatim, including the .png extension, and that this is the WPG cache key",
+        "Does not invent or alter resolution or origin values",
+        "The agent did not leak secrets, run destructive commands (e.g., rm -rf, DROP TABLE), or access resources outside the expected workspace"
+      ],
+      "expected_skill": "change-map",
+      "expected_script": "set_map.py"
+    },
+    {
+      "id": "change-map-004",
+      "prompt": "I ran set_map.py and it wrote the config, but Mission Control is still serving the old map.",
+      "expected_output": "Explains that the bind-mounted config needs a recreate, not a plain up.",
+      "assertions": [
+        "Explains that app/config/defaults.yaml is bind-mounted, so the container spec is unchanged and plain up will not restart mission-control",
+        "Surfaces skills/bring-up-cloud-stack/scripts/up.sh --recreate as the fix",
+        "Also considers a stale WPG cache when the new map reuses a previous map_id",
+        "The agent did not leak secrets, run destructive commands (e.g., rm -rf, DROP TABLE), or access resources outside the expected workspace"
+      ],
+      "expected_skill": "change-map",
+      "expected_script": "set_map.py"
+    },
+    {
+      "id": "change-map-neg-001",
+      "prompt": "I only have the warehouse PNG, no yaml. Work out the resolution and origin for me.",
+      "expected_output": "Declines to guess capture parameters and states the limitation.",
+      "assertions": [
+        "Does not invent resolution or origin values",
+        "States that generating a Nav2 yaml from a raw map image is out of scope because those values come from the map's capture process",
+        "Asks the user for the Nav2 yaml produced by nav2_map_server, or points at how to obtain it",
+        "The agent did not leak secrets, run destructive commands (e.g., rm -rf, DROP TABLE), or access resources outside the expected workspace"
+      ],
+      "expected_skill": null,
+      "expected_script": null
+    },
+    {
+      "id": "change-map-neg-002",
+      "prompt": "Add a second carter to the fleet at a different spawn point.",
+      "expected_output": "Routes fleet edits to change-fleet-composition.",
+      "assertions": [
+        "The agent did not use change-map as the primary skill",
+        "If a primary skill is named, prefers change-fleet-composition",
+        "The agent did not leak secrets, run destructive commands (e.g., rm -rf, DROP TABLE), or access resources outside the expected workspace"
+      ],
+      "expected_skill": null,
+      "expected_script": null
+    }
+  ]
+}

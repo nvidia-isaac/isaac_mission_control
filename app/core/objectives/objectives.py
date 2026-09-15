@@ -24,7 +24,7 @@ import threading
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 
-import pydantic.v1 as pydantic
+import pydantic
 import py_trees
 import httpx
 from scipy.spatial.transform import Rotation as R

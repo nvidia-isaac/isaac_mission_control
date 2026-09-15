@@ -1,16 +1,25 @@
-# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import asyncio
 import json
 import logging
 import time
-import pydantic.v1 as pydantic
+import pydantic
 from httpx import HTTPError
 from typing import Optional
 
@@ -34,7 +43,7 @@ class CuOptFleetData(pydantic.BaseModel):
     capacities: Optional[list] = None
 
     def __repr__(self) -> str:
-        return str(self.dict())
+        return str(self.model_dump())
 
 
 class CuOptParams(pydantic.BaseModel):
@@ -57,7 +66,7 @@ class CuOptSyncObject(pydantic.BaseModel):
         "Solver configuration parameters")
 
     def __repr__(self) -> str:
-        return str(self.dict())
+        return str(self.model_dump())
 
 
 class CuOptClient(BaseAPIClient):
@@ -132,7 +141,8 @@ class CuOptClient(BaseAPIClient):
                                       cost_matrix_data={},
                                       travel_time_waypoint_graph_data={},
                                       solver_config=params)
-        logging.debug(json.dumps(sync_object.dict()))
+        sync_payload = sync_object.model_dump(mode="json")
+        logging.debug(json.dumps(sync_payload))
         logger = logging.getLogger("Isaac Mission Control")
         try:
             endpoint = self._base_url + \
@@ -141,7 +151,7 @@ class CuOptClient(BaseAPIClient):
             request_id_response = await self.make_request_with_logs("post", endpoint,
                                                             "Failed to obtain cuOpt request_id",
                                                             "cuOpt request_id obtained",
-                                                            json=sync_object.dict())
+                                                            json=sync_payload)
             reqId = request_id_response["reqId"]
             endpoint = self._base_url + \
                 self._endpoints["solution"]["path"] + \

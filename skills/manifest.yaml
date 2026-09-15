@@ -1,0 +1,26 @@
+skills:
+  # ── Public user-facing skills
+  - path: skills/bring-up-cloud-stack
+    audience: user
+    scope: external
+
+  - path: skills/change-fleet-composition
+    audience: user
+    scope: external
+
+  - path: skills/change-map
+    audience: user
+    scope: external
+
+  - path: skills/change-stack-version
+    audience: user
+    scope: external
+
+  - path: skills/submit-and-monitor-mission
+    audience: user
+    scope: external
+
+  # ── Public developer skills (source code required)
+  - path: skills/build-mission-control-image
+    audience: dev
+    scope: external

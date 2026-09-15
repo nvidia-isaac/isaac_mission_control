@@ -1,10 +1,19 @@
-# Copyright (c) 2023-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import asyncio
 import time
@@ -165,9 +174,9 @@ class MissionDatabaseClient(BaseAPIClient):
         if robot.labels:
             data["labels"] = robot.labels
         if robot.heartbeat_timeout:
-            data["heartbeat_timeout"] = robot.heartbeat_timeout.seconds
+            data["heartbeat_timeout"] = robot.heartbeat_timeout.total_seconds()
         if robot.battery:
-            data["battery"] = dict(robot.battery)
+            data["battery"] = robot.battery.model_dump(mode="json")
         await self.make_request_with_logs("post", endpoint,
                                           f"Failed to create robot {robot.name}.",
                                           f"Created robot {robot.name}",
@@ -219,8 +228,9 @@ class MissionDatabaseClient(BaseAPIClient):
 
     async def update_objective(self, objective: ObjectiveV1):
         """Update objective status"""
-        data = {"status": objective.status.dict()}
-        self._logger.debug("Objective status: %s", str(objective.status.dict()))
+        status = objective.status.model_dump(mode="json")
+        data = {"status": status}
+        self._logger.debug("Objective status: %s", status)
         endpoint_info = self._endpoints["objective"]
         endpoint = self._base_url + endpoint_info["path"] + "/" + objective.name
         return await self.make_request_with_logs("put", endpoint,

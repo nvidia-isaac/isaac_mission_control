@@ -1,16 +1,25 @@
-# Copyright (c) 2024-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import uuid
 import logging
 from typing import Optional, Union
 from fastapi import FastAPI, HTTPException, status, Response, UploadFile, File, Request
-from pydantic.v1 import ValidationError
+from pydantic import ValidationError
 from app.core.mission_control import MissionControl
 from app.core.objectives.objectives import ObjectiveExecutor
 from app.api.clients.cuopt_client import CuOptOptimizationException
@@ -20,6 +29,7 @@ from cloud_common.objects.objective import ObjectiveBehaviorNode, ObjectiveCompo
 from app.api.endpoints.sap_api import router as sap_router
 from app.core.mission_control_config import MapConfig
 import os
+import re
 from fastapi.staticfiles import StaticFiles
 import zipfile
 import hashlib
@@ -56,6 +66,7 @@ os.makedirs(MAP_STORAGE_DIR, exist_ok=True)
 app.mount("/maps", StaticFiles(directory=MAP_STORAGE_DIR), name="uploaded_maps")
 
 # Registry of uploaded maps in memory (map_id -> MapConfig)
+MAP_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 app.state.available_maps = {}
 
 
@@ -149,7 +160,8 @@ async def send_undock_mission(robot_name: str, mission_id: Optional[str] = None)
 
 
 @app.post("/mission/pick_and_place", tags=["Main"])
-async def send_pickplace_mission(robot_name: str, pick_place_data: PickPlaceData, mission_id: Optional[str] = None):
+async def send_pickplace_mission(robot_name: str, pick_place_data: PickPlaceData,
+                                 mission_id: Optional[str] = None):
     """ Send pick and place mission """
     try:
         mc = await mc_ready()
@@ -163,14 +175,16 @@ async def send_pickplace_mission(robot_name: str, pick_place_data: PickPlaceData
 
 
 @app.post("/mission/multi_object_pickplace", tags=["Main"])
-async def send_multi_object_pickplace_mission(robot_name: str, multi_object_pickplace_data: MultiObjectPickPlaceData,
+async def send_multi_object_pickplace_mission(robot_name: str,
+                                              multi_object_pickplace_data: MultiObjectPickPlaceData,
                                               mission_id: Optional[str] = None):
     """ Send multi-object pick and place mission """
     try:
         mc = await mc_ready()
         robot_inventory = mc.robots
         robot = robot_inventory.get_robot(robot_name)
-        return await mc.submit_multi_object_pickplace_mission(robot, multi_object_pickplace_data, mission_id)
+        return await mc.submit_multi_object_pickplace_mission(
+            robot, multi_object_pickplace_data, mission_id)
     except (ValidationError, ValueError, KeyError, ICSError) as exc:
         logger.error(exc)
         logger.error(exc.args[0])
@@ -229,7 +243,7 @@ async def submit_objective(data: Union[ObjectiveCompositeNode,
                                        ObjectiveDecoratorNode]):
     """ Submit an objective """
     mc = await mc_ready()
-    logging.info(data.dict())
+    logging.info(data.model_dump())
     obj = await mc.mission_database_client.create_objective()
     obj.status.objective_tree = data
     await mc.mission_database_client.update_objective(obj)
@@ -285,7 +299,7 @@ async def get_map_metadata():
         map_config = mc.config.get_map_config()
         if not map_config.metadata:
             raise ValueError("No map metadata configured.")
-        return map_config.metadata.dict()
+        return map_config.metadata.model_dump(mode="json")
     except Exception as exc:  # pylint: disable=broad-except
         logger.error("Unable to provide map metadata: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -304,6 +318,11 @@ async def upload_map(request: Request, map_image: UploadFile = File(...), metada
     # Determine map_id
     map_id = map_id or os.path.splitext(
         os.path.basename(map_image.filename))[0]
+    if not MAP_ID_RE.fullmatch(map_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid map_id: use only letters, digits, underscores, and hyphens",
+        )
 
     # Save image
     img_path = os.path.join(
@@ -427,7 +446,7 @@ async def update_robot_map(robot_name: str, map_id: str, request: Request):
     # Early guard: only allow map-changing when robot is IDLE (return 409 to caller)
     try:
         logger.info(
-                "Robot status: %s", robot.status.dict())
+                "Robot status: %s", robot.status.model_dump())
         if getattr(robot, "status", None) is None or getattr(robot.status, "state", None) is None:
             logger.warning("Robot %s has no status/state; refusing map update", robot_name)
             raise HTTPException(status_code=409, detail="Robot status unknown. Map update not sent.")

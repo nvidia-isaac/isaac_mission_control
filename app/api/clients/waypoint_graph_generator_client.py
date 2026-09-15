@@ -1,10 +1,19 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 from typing import Optional
 
@@ -47,8 +56,8 @@ class WaypointGraphGeneratorClient(BaseAPIClient):
         self._logger.info("Requesting new graph from API")
         map_config = MissionControlConfig.get_instance().get_map_config()
         
-        metadata = map_config.metadata.copy()
-        data = metadata.dict()
+        metadata = map_config.metadata.model_copy()
+        data = metadata.model_dump(mode="json")
         self._logger.debug("WPG Data: %s", str(data))
         files = None
         if map_config.map_file or map_config.map_s3:

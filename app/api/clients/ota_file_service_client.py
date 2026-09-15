@@ -1,16 +1,25 @@
-# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import json
 import logging
 from typing import Optional
 
-from pydantic.v1 import BaseModel
+from pydantic import BaseModel
 
 from app.api.clients.base_api_client import BaseAPIClient
 
@@ -61,7 +70,8 @@ class OTAFileServiceClient(BaseAPIClient):
             map_path, "rb")
         if map_metadata["map_id"] in [file["s3_object_name"] for file in list_result]:
             file_info = OTAFile(
-                s3_object_name=map_metadata["map_id"], file_metadata=map_metadata).dict()
+                s3_object_name=map_metadata["map_id"],
+                file_metadata=map_metadata).model_dump(mode="json")
             files = {
                 "file_info": (None, json.dumps(file_info)),
                 "file": (map_path.split("/")[-1], map_content_upload)
@@ -72,7 +82,8 @@ class OTAFileServiceClient(BaseAPIClient):
 
         else:
             file_info = OTAFile(
-                s3_object_name=map_metadata["map_id"], file_metadata=map_metadata).dict()
+                s3_object_name=map_metadata["map_id"],
+                file_metadata=map_metadata).model_dump(mode="json")
             files = {
                 "file_info_list": (None, json.dumps({"file_list": [file_info]})),
                 "files": (map_path.split("/")[-1], map_content_upload)
