@@ -1,10 +1,19 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import asyncio
 import time
@@ -126,7 +135,8 @@ class MissionControlClient(BaseAPIClient):
 
         api_fields = self._endpoints["mission"]["fields"]
         params = {k: v for k, v in mission.items() if k in api_fields}
-        structured_mission = MissionData(**mission["mission_data"]).dict()
+        structured_mission = MissionData(
+            **mission["mission_data"]).model_dump(mode="json")
         result = await self.make_request_with_logs("post", endpoint, "Mission control error",
                                                    "Mission control accepted mission",
                                                    params=params, json=structured_mission)
@@ -159,7 +169,8 @@ class MissionControlClient(BaseAPIClient):
 
         result = await self.make_request_with_logs("post", endpoint, "Mission control error",
                                                    "Mission control accepted pickplace mission",
-                                                   params=params, json=pick_place_data.dict())
+                                                   params=params,
+                                                   json=pick_place_data.model_dump(mode="json"))
         return result
 
     async def send_objdetection_mission(self, robot_name: str):
@@ -232,7 +243,7 @@ class MissionControlClient(BaseAPIClient):
         try:
             async with self._client.post(
                 endpoint, 
-                json=mission_data.dict(),
+                json=mission_data.model_dump(mode="json"),
                 headers={"Accept": "image/png"}
             ) as response:
                 response.raise_for_status()

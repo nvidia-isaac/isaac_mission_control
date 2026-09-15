@@ -17,7 +17,7 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 """
 
-import pydantic.v1 as pydantic
+import pydantic
 import asyncio
 from enum import Enum
 import re
@@ -53,33 +53,35 @@ class ConditionalExpression(pydantic.BaseModel):
     operator: ConditionalOperator
     operands: list[Union["ConditionalExpression", str, float]]
 
-    @pydantic.validator("type", pre=True)
+    @pydantic.field_validator("type", mode="before")
+    @classmethod
     def type_validator(cls, value):
         if isinstance(value, str):
             value = value.lower()
         return value
 
-    @pydantic.validator("operator", pre=True)
+    @pydantic.field_validator("operator", mode="before")
+    @classmethod
     def operator_validator(cls, value):
         if isinstance(value, str):
             value = value.lower()
         return value
 
-    @pydantic.root_validator()
-    def operands_validator(cls, values):
-        if values.get("type") == ConditionalType.LOGICAL_EXPRESSION:
-            if not values.get("operator").is_logical_operator:
+    @pydantic.model_validator(mode="after")
+    def operands_validator(self):
+        if self.type == ConditionalType.LOGICAL_EXPRESSION:
+            if not self.operator.is_logical_operator:
                 raise ValueError("Logical expression must have a logical operator")
-            if len(values.get("operands")) < 2:
+            if len(self.operands) < 2:
                 raise ValueError("Logical expression must have at least two operands")
-        elif values.get("type") == ConditionalType.COMPARISON:
-            if values.get("operator").is_logical_operator:
+        elif self.type == ConditionalType.COMPARISON:
+            if self.operator.is_logical_operator:
                 raise ValueError("Comparison must have a comparison operator")
-            if len(values.get("operands")) != 2:
+            if len(self.operands) != 2:
                 raise ValueError("Comparison must have exactly two operands")
-        return values
+        return self
 
-ConditionalExpression.update_forward_refs()
+ConditionalExpression.model_rebuild()
 
 async def _evaluate_logical_expression(expression: ConditionalExpression, db_client: MissionDatabaseClient) -> bool:
     evaluated_operands = await asyncio.gather(*[evaluate_conditional(operand, db_client) for operand in expression.operands])
@@ -138,24 +140,24 @@ regex_map = {
     "robot_battery_level": r"robot_battery_level\((.*)\)"
 }
 
-async def dereference(ref: str, db_client: MissionDatabaseClient):
-    for key, regex in regex_map.items():
-        match = re.fullmatch(regex, ref)
-        if match:
-            arg = match.group(1)
-            if key == "robot_state":
-                result = (await db_client.get_robot(arg)).status.state.value
-                return result
-            elif key == "robot_battery_level":
-                result = (await db_client.get_robot(arg)).status.battery_level
-                return result
-    # If no match, return the string as is
+async def dereference(ref: Union[str, float], db_client: MissionDatabaseClient):
+    if isinstance(ref, str):
+        for key, regex in regex_map.items():
+            match = re.fullmatch(regex, ref)
+            if match:
+                arg = match.group(1)
+                if key == "robot_state":
+                    result = (await db_client.get_robot(arg)).status.state.value
+                    return result
+                if key == "robot_battery_level":
+                    result = (await db_client.get_robot(arg)).status.battery_level
+                    return result
+    # If no reference matches, return the operand as is.
     return ref
 
-def is_number(s: str) -> bool:
+def is_number(s: Union[str, float]) -> bool:
     try:
         float(s)
         return True
     except ValueError:
         return False
-

@@ -1,9 +1,4 @@
-###############################################################################
-# Bazel now uses Bzlmod by default to manage external dependencies.
-# Please consider migrating your external dependencies from WORKSPACE to MODULE.bazel.
-#
-# For more details, please check https://github.com/bazelbuild/bazel/issues/18958
-###############################################################################
+# Mission Control uses Bzlmod for external dependency management.
 
 module(name = "nvidia_isaac_mission_control", version = "1.0")
 
@@ -37,7 +32,7 @@ oci.pull(
 oci.pull(
     name = "python",
     # Must match rules_python python.toolchain python_version (3.13) so pip wheels run.
-    image = "nvcr.io/nvidia/distroless/python:3.13-v4.0.8",
+    image = "nvcr.io/nvidia/distroless/python:3.13-v4.1.4",
     platforms = [
         "linux/amd64",
         # This image's arm64 manifest declares variant v8; rules_oci matches the
@@ -63,26 +58,26 @@ oci.pull(
 )
 oci.pull(
     name = "mission_simulator_base",
-    image = "nvcr.io/nvidia/isaac/mission-simulator:4.6.0",
+    image = "nvcr.io/nvidia/isaac/mission-simulator:5.0.0",
     platforms = [
         "linux/amd64",
-        "linux/arm64",
+        "linux/arm64/v8",
     ],
 )
 oci.pull(
     name = "mission_dispatch_base",
-    image = "nvcr.io/nvidia/isaac/mission-dispatch:4.6.0",
+    image = "nvcr.io/nvidia/isaac/mission-dispatch:5.0.0",
     platforms = [
         "linux/amd64",
-        "linux/arm64",
+        "linux/arm64/v8",
     ],
 )
 oci.pull(
     name = "mission_database_base",
-    image = "nvcr.io/nvidia/isaac/mission-database:4.6.0",
+    image = "nvcr.io/nvidia/isaac/mission-database:5.0.0",
     platforms = [
         "linux/amd64",
-        "linux/arm64",
+        "linux/arm64/v8",
     ],
 )
 oci.pull(
@@ -108,13 +103,13 @@ use_repo(
     "cuopt_base_linux_arm64",
     "mission_database_base",
     "mission_database_base_linux_amd64",
-    "mission_database_base_linux_arm64",
+    "mission_database_base_linux_arm64_v8",
     "mission_dispatch_base",
     "mission_dispatch_base_linux_amd64",
-    "mission_dispatch_base_linux_arm64",
+    "mission_dispatch_base_linux_arm64_v8",
     "mission_simulator_base",
     "mission_simulator_base_linux_amd64",
-    "mission_simulator_base_linux_arm64",
+    "mission_simulator_base_linux_arm64_v8",
     "mosquitto_base",
     "mosquitto_base_linux_amd64",
     "mosquitto_base_linux_arm64_v8",

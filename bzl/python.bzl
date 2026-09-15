@@ -1,10 +1,19 @@
-# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 load("@python_third_party_linting//:requirements.bzl", "requirement")
 load("@aspect_rules_py//py:defs.bzl", "py_image_layer")
@@ -83,8 +92,8 @@ def mission_control_py_binary(**kwargs):
 
     # Isolate setuptools into its own layer group so it can be omitted from the
     # image (see oci_image.tars below). setuptools is a build-time tool pulled
-    # into the runtime closure only transitively (kratos-pycloudevents lists it
-    # as a dependency) and is never imported at runtime. Dropping it also drops
+    # into the runtime closure only transitively and is never imported at
+    # runtime. Dropping it also drops
     # the vulnerable copies of wheel and jaraco.context that setuptools vendors
     # under setuptools/_vendor. Custom layer_groups are matched before the
     # default "packages" group, so all other site-packages still ship normally.
@@ -111,8 +120,9 @@ def mission_control_py_binary(**kwargs):
         outs = [kwargs["name"] + "_oci_launcher_layer.tar.gz"],
         cmd = (
             "mkdir -p $$(dirname $@)/oci_launch_staging/app && " +
-            "cp $(location //bzl:oci_runfiles_launcher.py) $$(dirname $@)/oci_launch_staging/app/oci_runfiles_launcher.py && " +
-            "tar -C $$(dirname $@)/oci_launch_staging -czf $@ ."
+            "install -m 0644 $(location //bzl:oci_runfiles_launcher.py) " +
+            "$$(dirname $@)/oci_launch_staging/app/oci_runfiles_launcher.py && " +
+            "tar --owner=0 --group=0 -C $$(dirname $@)/oci_launch_staging -czf $@ ."
         )
     )
 

@@ -1,14 +1,23 @@
-# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import enum
-import pydantic.v1 as pydantic
-from typing import Dict, Optional
+import pydantic
+from typing import Any, Dict, Optional
 from cloud_common.objects.common import ICSUsageError, Point2D, Pose3D
 
 
@@ -81,8 +90,11 @@ class MissionData(pydantic.BaseModel):
         default=[],
         description="The indexes of points where the robot needs to switch to teleop.")
 
-    @pydantic.root_validator(pre=True)
-    def _validate_mission_data(cls, values):
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def _validate_mission_data(cls, values: Any):
+        if not isinstance(values, dict):
+            return values
         if values.get("teleop"):
             if len(values["teleop"]) > len(values["route"]):
                 raise ICSUsageError(
@@ -187,7 +199,8 @@ class MultiObjectPickPlaceTargetPoses(pydantic.BaseModel):
     frame_id: str
     poses: list[Pose3D]
 
-    @pydantic.validator("poses")
+    @pydantic.field_validator("poses")
+    @classmethod
     def _validate_poses(cls, v):
         if len(v) == 0:
             raise ICSUsageError("poses must be a non-empty list")
@@ -199,22 +212,19 @@ class MultiObjectPickPlaceData(pydantic.BaseModel):
     class_ids: list[str]
     target_poses: MultiObjectPickPlaceTargetPoses
 
-    @pydantic.validator("class_ids")
-    def _validate_class_ids(cls, v, values):
-        if values["mode"] == MultiObjectPickPlaceModes.MULTI_BIN and len(v) == 0:
+    @pydantic.model_validator(mode="after")
+    def _validate_mode_requirements(self):
+        if self.mode == MultiObjectPickPlaceModes.MULTI_BIN and len(self.class_ids) == 0:
             raise ICSUsageError("Multi bin mode requires a non-empty class_ids")
-        return v
-
-    @pydantic.validator("target_poses")
-    def _validate_target_poses(cls, v, values):
-        if values["mode"] == MultiObjectPickPlaceModes.MULTI_BIN and \
-            len(v.poses) != len(values["class_ids"]):
+        if self.mode == MultiObjectPickPlaceModes.MULTI_BIN and \
+            len(self.target_poses.poses) != len(self.class_ids):
             raise ICSUsageError(
                 "For multi bin mode, the number of target poses must be equal to the number of "
                 "class_ids")
-        if values["mode"] == MultiObjectPickPlaceModes.SINGLE_BIN and len(v.poses) != 1:
+        if self.mode == MultiObjectPickPlaceModes.SINGLE_BIN and \
+                len(self.target_poses.poses) != 1:
             raise ICSUsageError("Single bin mode requires exactly 1 target pose")
-        return v
+        return self
 
 
 class ActionData(pydantic.BaseModel):

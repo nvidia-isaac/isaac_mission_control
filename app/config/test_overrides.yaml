@@ -1,10 +1,19 @@
-# Copyright (c) 2025-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 # This file contains test-specific overrides for the base configuration
 
@@ -50,6 +59,26 @@ galileo_hubble:
           y: 19.7377
           yaw: 1.36224
       
+# S3 map test overrides
+map_file_s3:
+  map:
+    map_file: null
+    map_s3: s3://maps/augmented_map.png
+    metadata_yaml: /config/test_map_s3_metadata.yaml
+    metadata:
+      map_id: "galileo_hubble"
+      resolution: 0.05
+      occupancy_threshold: 129
+      x_offset: 1000.0
+      y_offset: 1000.0
+    docks:
+      - dock_id: dock01
+        dock_type: nova_carter_dock
+        dock_pose:
+          x: 43.7278
+          y: 19.7377
+          yaw: 1.36224
+
 # Robots test overrides
 robots:
   robots:

@@ -1,0 +1,118 @@
+{{- if .Values.enableChart }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mission-control.fullname" . }}
+  labels:
+    {{- include "mission-control.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "mission-control.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "mission-control.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mission-control.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh"]
+          args: 
+          - -c
+          - | 
+            /app/app/mission-control-img.binary \
+            --config /mission-control-configs/defaults.yaml --verbose {{ .Values.verbosity }} \
+            --enable_mega_observability
+          env:
+          - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                name: nvcf-observability-opentelemetry-env-vars
+                key: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+                optional: true
+          - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                name: nvcf-observability-opentelemetry-env-vars
+                key: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+                optional: true
+          - name: OTEL_EXPORTER_OTLP_LOGS_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                name: nvcf-observability-opentelemetry-env-vars
+                key: OTEL_EXPORTER_OTLP_LOGS_ENDPOINT
+                optional: true
+          - name: OTEL_EXPORTER_OTLP_PROTOCOL
+            valueFrom:
+              configMapKeyRef:
+                name: nvcf-observability-opentelemetry-env-vars
+                key: OTEL_EXPORTER_OTLP_PROTOCOL
+                optional: true
+          {{- range .Values.environment }}
+          - name: {{ .name }}
+            value: {{ .value | quote }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8050
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          startupProbe:
+            {{- toYaml .Values.startupProbe | nindent 12 }}
+          resources:
+            limits:
+              cpu: {{ .Values.resources.missionControl.limits.cpu }}
+              memory: {{ .Values.resources.missionControl.limits.memory }}
+            requests:
+              cpu: {{ .Values.resources.missionControl.requests.cpu }}
+              memory: {{ .Values.resources.missionControl.requests.memory }}
+          volumeMounts:
+          {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+            - name: mission-control-configs
+              mountPath: /mission-control-configs
+      volumes:
+      {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+        - name: mission-control-configs
+          configMap:
+            name: {{ include "mission-control.fullname" . }}-config
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

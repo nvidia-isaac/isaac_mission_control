@@ -1,10 +1,19 @@
-# Copyright (c) 2022-2026, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import asyncio
 import enum
@@ -15,7 +24,7 @@ import time
 import uuid
 from typing import Optional, Dict, Any
 import boto3
-import pydantic.v1 as pydantic
+import pydantic
 import requests
 import httpx
 import os
@@ -178,7 +187,8 @@ class MissionControl:
                 map_url = map_config.map_file if map_config.map_file else map_config.map_uri
                 response = requests.get(map_url, timeout=30)
                 self.ota_client.ota_file_upload(
-                    map_config.metadata.dict(), map_content=response.content)
+                    map_config.metadata.model_dump(mode="json"),
+                    map_content=response.content)
             if map_config.push_map_on_startup:
                 await self.mission_dispatch_client.enable_map_action(
                     self.robots.get_robots(), map_id=map_config.metadata.map_id,
@@ -267,7 +277,7 @@ class MissionControl:
         # Get assembled mission and target locations
         assembled_mission = mission_data.get_assembled_mission()
         target_locations = await self.wpg_client.get_nearest_nodes(
-            [point.dict() for point in assembled_mission.points])
+            [point.model_dump(mode="json") for point in assembled_mission.points])
         
         waypoint_graph = self.wpg_cache
 
@@ -613,7 +623,7 @@ class MissionControl:
         if db_robot.status.factsheet.agv_class != VDA5050AgvClass.MANIPULATOR.value:
             raise ICSUsageError(f"Robot {robot.name} is not a manipulator.")
         mission_data = MissionData(route=[])
-        mission_data_extend = MissionDataExtend(**mission_data.dict())
+        mission_data_extend = MissionDataExtend(**mission_data.model_dump())
         submission = await self.mission_dispatch_client.create_pickplace_mission(
             robot.name, pick_place_data, 600)
         mission_data_extend.sub_mission_uuids.append(submission["name"])
@@ -634,7 +644,7 @@ class MissionControl:
             raise ICSServerError(f"Robot {robot.name} is running")
 
         mission_data = MissionData(route=[])
-        mission_data_extend = MissionDataExtend(**mission_data.dict())
+        mission_data_extend = MissionDataExtend(**mission_data.model_dump())
         submission = await self.mission_dispatch_client.create_undock_mission(
             robot.name, timeout_s=mission_data.timeout, mission_id=mission_id)
         mission_data_extend.sub_mission_uuids.append(submission["name"])
@@ -708,7 +718,7 @@ class MissionControl:
         if db_robot.status.factsheet.agv_class != VDA5050AgvClass.MANIPULATOR.value:
             raise ICSUsageError(f"Robot {robot.name} is not a manipulator.")
         mission_data = MissionData(route=[])
-        mission_data_extend = MissionDataExtend(**mission_data.dict())
+        mission_data_extend = MissionDataExtend(**mission_data.model_dump())
         submission = await self.mission_dispatch_client.create_multi_object_pickplace_mission(
             robot.name, multi_object_pickplace_data, 600)
         mission_data_extend.sub_mission_uuids.append(submission["name"])
@@ -721,7 +731,7 @@ class MissionControl:
         vehicle_data = msg["vehicle_data"]
         self.logger.debug("Vehicle_data: %s", str(vehicle_data))
         nodes = graph.nodes
-        mission_data_extend = MissionDataExtend(**mission_data.dict())
+        mission_data_extend = MissionDataExtend(**mission_data.model_dump())
 
         for robot, mission in vehicle_data.items():
             waypoints = []
@@ -741,7 +751,7 @@ class MissionControl:
                     theta=theta,
                     map_id=graph.map_id,
                     allowedDeviationXY=0 if mission["type"][i] == "Delivery" else 1,
-                    allowedDeviationTheta=3.14).dict())
+                    allowedDeviationTheta=3.14).model_dump(mode="json"))
                 from_node = to_node
             if len(waypoints) > 1:
                 waypoints[0]["theta"] = waypoints[1]["theta"]

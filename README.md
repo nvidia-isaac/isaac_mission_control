@@ -86,7 +86,7 @@ Developers can choose to run `mission-control` with the `--dev` option to enable
 Best practice is to have simulated robots execute missions:
 
 ```
-docker run -it --network host nvcr.io/nvidia/isaac/mission-simulator:4.6.0 --robots robot_a,4,5 robot_b,5,6
+docker run -it --network host nvcr.io/nvidia/isaac/mission-simulator:5.0.0 --robots robot_a,4,5 robot_b,5,6
 ```
 
 If you want to start the whole stack, including Mission Control, from Docker Compose:
@@ -224,6 +224,7 @@ Mission Control adds additional robot types to support more specialized use case
 
 | Mission Control Version | Changes |
 | ----- | ----- |
+| 5.0.0 | Add skills |
 | 4.6.0 | Add VDA5050 Action node |
 | 4.3.0 | ARM64 support for DGX Spark, Map distribution API |
 | 4.0.0 | Objectives, navigate to exact position |

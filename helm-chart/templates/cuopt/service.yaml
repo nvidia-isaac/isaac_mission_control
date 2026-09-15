@@ -1,0 +1,18 @@
+{{- if .Values.enableChart }}
+{{- if .Values.cuopt.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mission-control.fullname" . }}-cuopt
+  labels:
+    {{- include "mission-control.cuopt.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "mission-control.cuopt.selectorLabels" . | nindent 4 }}
+{{- end }}
+{{- end }}
