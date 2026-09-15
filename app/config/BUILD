@@ -1,8 +1,7 @@
 exports_files([
     "defaults.yaml",
     "test_base.yaml",
-    "test_overrides.yaml",
-    "test_map_s3_metadata.yaml"
+    "test_overrides.yaml"
 ])
 
 filegroup(

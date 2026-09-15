@@ -59,26 +59,6 @@ galileo_hubble:
           y: 19.7377
           yaw: 1.36224
       
-# S3 map test overrides
-map_file_s3:
-  map:
-    map_file: null
-    map_s3: s3://maps/augmented_map.png
-    metadata_yaml: /config/test_map_s3_metadata.yaml
-    metadata:
-      map_id: "galileo_hubble"
-      resolution: 0.05
-      occupancy_threshold: 129
-      x_offset: 1000.0
-      y_offset: 1000.0
-    docks:
-      - dock_id: dock01
-        dock_type: nova_carter_dock
-        dock_pose:
-          x: 43.7278
-          y: 19.7377
-          yaw: 1.36224
-
 # Robots test overrides
 robots:
   robots:

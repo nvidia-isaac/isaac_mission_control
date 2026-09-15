@@ -82,7 +82,6 @@ logging.debug("CONFIG_DIR: %s", CONFIG_DIR)
 class TestConfigKey(Enum):
     DOCKS = "docks"
     GALILEO_HUBBLE = "galileo_hubble"
-    MAP_FILE_S3 = "map_file_s3"
     ROBOTS = "robots"
     PICKPLACE = "pickplace"
 
