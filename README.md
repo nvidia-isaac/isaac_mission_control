@@ -25,6 +25,10 @@ Visit [config_tutorial.md](docs/config_tutorial.md) to understand the Mission Co
 
 Visit [objectives_doc.md](docs/objectives_doc.md) to understand how to create multi-robot objectives in Mission Control.
 
+## Agent Mode Showcase
+
+Visit the [Isaac ROS Mission Control Tutorial](https://nvidia-isaac-ros.github.io/repositories_and_packages/isaac_ros_cloud_control/isaac_ros_mission_client/tutorial_isaac_mission_control.html#agent-mode) to see how to drive Mission Control through an AI coding assistant (Claude Code, Cursor, Codex, and other tools in the Agent Skills client showcase) using its agent skill.
+
 ## Get Started
 
 ### Local Development
